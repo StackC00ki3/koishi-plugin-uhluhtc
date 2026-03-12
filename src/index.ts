@@ -57,18 +57,11 @@ export async function apply(ctx: Context, config: Config) {
         '3.查询怪物详细信息： #[分支简称]?[英文怪兽名] （分支简称可用查询怪物[英文]来获取）'
     })
 
-  // 查询怪物（中文/英文）
-  ctx.middleware(async (session, next) => {
-    const content = session.content?.trim()
-    if (!content) return next()
-
-    // 查询怪物贴图
-    if (content.startsWith('查询怪物贴图') && content.length > 6) {
-      const monName = content.substring(6).trim()
-      const result = await monsterDB.searchMonster(monName, translation)
-
+  // 查询怪物贴图
+  ctx.command('查询怪物贴图 <name:text>', '查询怪物贴图')
+    .action(async (_, name) => {
+      const result = await monsterDB.searchMonster(name, translation)
       if (result.images && result.images.length > 0) {
-        // 发送图片和文本
         const imageBuffers: Buffer[] = result.images
         const imgElement = imageBuffers.length === 4
           ? h.image(await Tiles.merge2x2(imageBuffers), 'image/png')
@@ -79,49 +72,44 @@ export async function apply(ctx: Context, config: Config) {
       } else if (result.text) {
         return result.text
       }
-      return
-    }
+    })
 
-    if (content.startsWith('查询怪物') && content.length > 4) {
-      const monName = content.substring(4).trim()
-      const isChinese = /[\u4e00-\u9fa5]/.test(monName)
+  // 查询怪物（中文发贴图，英文发可选列表）
+  ctx.command('查询怪物 <name:text>', '查询怪物')
+    .action(async (_, name) => {
+      const isChinese = /[\u4e00-\u9fa5]/.test(name)
       if (isChinese) {
-        const result = await monsterDB.queryMonster("#v?" + monName, translation)
+        const result = await monsterDB.queryMonster('#v?' + name, translation)
         if (result.images && result.images.length > 0) {
           return h.image(result.images[0], 'image/png')
         } else if (result.text) {
           return result.text
         }
-        return
       } else {
-        const result = await monsterDB.searchMonster(monName, translation)
+        const result = await monsterDB.searchMonster(name, translation)
         if (result.text) {
           return result.text
         }
-        return
       }
-    }
+    })
 
+  // 翻译怪物名称
+  ctx.command('翻译 <text:text>', '翻译消息中的怪物名称')
+    .action((_, text) => {
+      return translation.translateMonsterNames(text)
+    })
 
-    // 翻译怪物名称
-    if (content.startsWith('翻译') && content.length > 2) {
-      let text = content.substring(2).trim()
-      text = translation.translateMonsterNames(text)
-      return text
-    }
-
-    // 查询怪物详细信息 #variant?monster
+  // 查询怪物详细信息 #variant?monster（通过消息事件匹配特殊格式）
+  ctx.on('message', async (session) => {
+    const content = session.content?.trim()
+    if (!content) return
     if (content.startsWith('#') && content.includes('?') && content.length > 2) {
       const result = await monsterDB.queryMonster(content, translation)
       if (result.images && result.images.length > 0) {
-        // 卡片图片直接发送（单张）
-        return h.image(result.images[0], 'image/png')
+        await session.send(h.image(result.images[0], 'image/png'))
       } else if (result.text) {
-        return result.text
+        await session.send(result.text)
       }
-      return
     }
-
-    return next()
   })
 }
