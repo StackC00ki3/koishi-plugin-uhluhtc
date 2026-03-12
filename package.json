@@ -1,7 +1,7 @@
 {
   "name": "koishi-plugin-uhluhtc",
   "description": "NetHack information query plugin for Koishi",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [
@@ -9,7 +9,8 @@
     "dist",
     "fonts",
     "monsterDB",
-    "tilesets"
+    "tilesets",
+    "locales"
   ],
   "license": "MIT",
   "scripts": {},
