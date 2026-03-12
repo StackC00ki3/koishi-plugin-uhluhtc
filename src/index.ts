@@ -8,12 +8,10 @@ export const name = 'uhluhtc'
 
 export interface Config {
   dataPath?: string
-  translationPath?: string
 }
 
 export const Config: Schema<Config> = Schema.object({
   dataPath: Schema.string().description('怪物数据库文件路径').default('./data/uhluhtc'),
-  translationPath: Schema.string().description('翻译文件路径').default('./locales/zh-CN.json')
 })
 
 export function apply(ctx: Context, config: Config) {
@@ -27,7 +25,7 @@ export function apply(ctx: Context, config: Config) {
   }
 
   const monsterDB = new MonsterDB(dataPath, ctx.logger)
-  const translation = new Translation(config.translationPath, ctx.logger)
+  const translation = new Translation(ctx.logger)
 
   ctx.logger.info(`已加载 ${monsterDB.getVariantCount()} 个变体的怪物数据库`)
 
