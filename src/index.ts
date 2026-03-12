@@ -48,9 +48,9 @@ export async function apply(ctx: Context, config: Config) {
     const content = session.content?.trim()
     if (!content) return next()
 
-    // 查询怪物功能
-    if (content.startsWith('查询怪物') && content.length > 4) {
-      const monName = content.substring(4).trim()
+    // 查询怪物贴图
+    if (content.startsWith('查询怪物贴图') && content.length > 6) {
+      const monName = content.substring(6).trim()
       const result = await monsterDB.searchMonster(monName, translation)
 
       if (result.images && result.images.length > 0) {
@@ -67,6 +67,27 @@ export async function apply(ctx: Context, config: Config) {
       }
       return
     }
+
+    if (content.startsWith('查询怪物') && content.length > 4) {
+      const monName = content.substring(4).trim()
+      const isChinese = /[\u4e00-\u9fa5]/.test(monName)
+      if (isChinese) {
+        const result = await monsterDB.queryMonster("#v?" + monName, translation)
+        if (result.images && result.images.length > 0) {
+          return h.image(result.images[0], 'image/png')
+        } else if (result.text) {
+          return result.text
+        }
+        return
+      } else {
+        const result = await monsterDB.searchMonster(monName, translation)
+        if (result.text) {
+          return result.text
+        }
+        return
+      }
+    }
+
 
     // 翻译怪物名称
     if (content.startsWith('翻译') && content.length > 2) {
