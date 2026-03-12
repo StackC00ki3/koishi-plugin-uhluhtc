@@ -496,8 +496,8 @@ export class Tiles {
         const ctx = canvas.getContext('2d')
 
         // 黑色背景
-        ctx.fillStyle = '#000000'
-        ctx.fillRect(0, 0, 13, 22)
+        // ctx.fillStyle = '#000000'
+        // ctx.fillRect(0, 0, 13, 22)
 
         // 彩色字符
         ctx.fillStyle = SYM_COLORS[color.toLowerCase()] ?? '#AAAAAA'
@@ -507,7 +507,7 @@ export class Tiles {
         const metrics = ctx.measureText(sym)
         const posX = (13 - metrics.width) / 2
         // 近似垂直居中：ascent ≈ 14px，height ≈ 20px → (22-20)/2 + 14 = 15
-        const posY = 15
+        const posY = 18
 
         ctx.fillText(sym, posX, posY)
         return canvas.toBuffer('image/png')
