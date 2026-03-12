@@ -259,7 +259,7 @@ function buildRows(data: MonsterCardData): Array<{ label: string; value: string;
   if (data.ac !== undefined) rows.push({ label: 'AC', value: String(data.ac), highlight: true })
   if (data.mr !== undefined) rows.push({ label: '魔法抗性', value: `${data.mr}%`, highlight: data.mr > 50 })
   if (data.alignment !== undefined) rows.push({ label: '阵营', value: alignmentLabel(data.alignment) })
-  if (data.size) rows.push({ label: '体型', value: data.size })
+  if (data.size) rows.push({ label: '体型', value: sizeLabel(data.size) })
   if (data.weight !== undefined) rows.push({ label: '重量', value: String(data.weight) })
   if (data.nutrition !== undefined) rows.push({ label: '营养价值', value: String(data.nutrition) })
 
@@ -273,6 +273,17 @@ function alignmentLabel(alignment: number | string): string {
     return '中立 (0)'
   }
   return String(alignment)
+}
+
+function sizeLabel(size: string): string {
+  switch (size.toLowerCase()) {
+    case 'tiny': return '微小'
+    case 'small': return '小'
+    case 'medium': return '中等'
+    case 'large': return '大'
+    case 'huge': return '巨大'
+    default: return size
+  }
 }
 
 function estimateFlagsH(flags: string[], maxW: number): number {
