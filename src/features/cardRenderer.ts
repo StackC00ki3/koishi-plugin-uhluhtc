@@ -25,7 +25,7 @@ export interface MonsterCardData {
   appearsInLargeGroups?: boolean
   leavesCorpse?: boolean
   genocidable?: boolean
-  tileImage?: Buffer   // 32×32 怪物贴图
+  tileImages?: Buffer[]  // 32×32 怪物贴图（每个 tileset 一张，最多 4 张）
 }
 
 // ── 调色板（Terraria 深色 UI 风格）─────────────────────────────────────────
@@ -87,7 +87,7 @@ export async function renderMonsterCard(data: MonsterCardData, dataDir?: string)
 
   // ── 预先计算动态高度 ─────────────────────────────────────────────────────
   const rows = buildRows(data)
-  const tileAreaH = 90    // 怪物图片区域高度
+  const tileAreaH = 78    // 怪物图片区域高度（60px tile + 上下边距）
   const headerH = 70      // 标题区
   const rowH = 24
   const rowsTotalH = rows.length * rowH
@@ -136,29 +136,38 @@ export async function renderMonsterCard(data: MonsterCardData, dataDir?: string)
 
   y += headerH
 
-  // ── 怪物图片区 ────────────────────────────────────────────────────────────
-  const tileBoxW = 80
-  const tileBoxH = 80
-  const tileBoxX = (CARD_W - tileBoxW) / 2
-  drawRoundRect(ctx, tileBoxX - 4, y - 4, tileBoxW + 8, tileBoxH + 8, 6, C.tileFrame)
-  drawRoundRect(ctx, tileBoxX - 2, y - 2, tileBoxW + 4, tileBoxH + 4, 5, C.tileFrameInner)
+  // ── 怪物图片区（横排最多 4 张）────────────────────────────────────────────
+  const tileSlotW = 60
+  const tileSlotH = 60
+  const tileGap = 8
+  const imgs = data.tileImages && data.tileImages.length > 0 ? data.tileImages.slice(0, 4) : []
+  const slotCount = Math.max(imgs.length, 1)
+  const rowW = slotCount * tileSlotW + (slotCount - 1) * tileGap
+  let tileStartX = (CARD_W - rowW) / 2
 
-  if (data.tileImage) {
-    try {
-      const img = await loadImage(data.tileImage)
-      // 放大 2.5x 居中绘制
-      const scale = Math.min(tileBoxW / img.width, tileBoxH / img.height)
-      const dw = img.width * scale
-      const dh = img.height * scale
-      ctx.imageSmoothingEnabled = false
-      ctx.drawImage(img, tileBoxX + (tileBoxW - dw) / 2, y + (tileBoxH - dh) / 2, dw, dh)
-    } catch { /* 图片加载失败则留空 */ }
+  if (imgs.length > 0) {
+    for (let i = 0; i < imgs.length; i++) {
+      const bx = tileStartX + i * (tileSlotW + tileGap)
+      drawRoundRect(ctx, bx - 4, y - 4, tileSlotW + 8, tileSlotH + 8, 6, C.tileFrame)
+      drawRoundRect(ctx, bx - 2, y - 2, tileSlotW + 4, tileSlotH + 4, 5, C.tileFrameInner)
+      try {
+        const img = await loadImage(imgs[i])
+        const scale = Math.min(tileSlotW / img.width, tileSlotH / img.height)
+        const dw = img.width * scale
+        const dh = img.height * scale
+        ctx.imageSmoothingEnabled = false
+        ctx.drawImage(img, bx + (tileSlotW - dw) / 2, y + (tileSlotH - dh) / 2, dw, dh)
+      } catch { /* 图片加载失败则留空 */ }
+    }
   } else {
-    // 画符号
+    // 无贴图：画符号
+    const bx = tileStartX
+    drawRoundRect(ctx, bx - 4, y - 4, tileSlotW + 8, tileSlotH + 8, 6, C.tileFrame)
+    drawRoundRect(ctx, bx - 2, y - 2, tileSlotW + 4, tileSlotH + 4, 5, C.tileFrameInner)
     ctx.font = `bold 36px "Microsoft YaHei", monospace`
     ctx.textAlign = 'center'
     ctx.fillStyle = C.accent
-    ctx.fillText(data.symbol || '?', CARD_W / 2, y + tileBoxH / 2 + 13)
+    ctx.fillText(data.symbol || '?', bx + tileSlotW / 2, y + tileSlotH / 2 + 13)
   }
 
   y += tileAreaH

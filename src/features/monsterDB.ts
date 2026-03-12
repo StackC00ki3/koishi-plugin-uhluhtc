@@ -188,9 +188,6 @@ export class MonsterDB {
     if (tileImages.length === 0 && this.tiles && monster.symbol) {
       tileImages = [this.tiles.genSymImage(monster.symbol, monster.color ?? 'white')]
     }
-    // 取第一张贴图代表该怪物
-    const tileImage = tileImages[0]
-
     // 构建卡片数据
     const cardData: MonsterCardData = {
       name,
@@ -213,7 +210,7 @@ export class MonsterDB {
       appearsInLargeGroups: monster['appears-in-large-groups'] === 'Yes',
       leavesCorpse: monster['leaves-corpse'] === 'Yes' ? true : monster['leaves-corpse'] === 'No' ? false : undefined,
       genocidable: monster.genocidable === 'Yes' ? true : monster.genocidable === 'No' ? false : undefined,
-      tileImage,
+      tileImages,
     }
 
     // 攻击列表
