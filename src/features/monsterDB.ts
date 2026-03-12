@@ -3,6 +3,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { Translation } from './translation'
 import { Tiles } from './tiles'
+import { renderMonsterCard, MonsterCardData } from './cardRenderer'
 import { Logger } from 'koishi'
 
 interface MonsterData {
@@ -183,11 +184,55 @@ export class MonsterDB {
     }
 
     // 优先从 tileset 取贴图，无贴图时用符号图片
-    let images: Buffer[] = this.tiles?.genImage(name) ?? []
-    if (images.length === 0 && this.tiles && monster.symbol) {
-      images = [this.tiles.genSymImage(monster.symbol, monster.color ?? 'white')]
+    let tileImages: Buffer[] = this.tiles?.genImage(name) ?? []
+    if (tileImages.length === 0 && this.tiles && monster.symbol) {
+      tileImages = [this.tiles.genSymImage(monster.symbol, monster.color ?? 'white')]
+    }
+    // 取第一张贴图代表该怪物
+    const tileImage = tileImages[0]
+
+    // 构建卡片数据
+    const cardData: MonsterCardData = {
+      name,
+      chineseName: translatedName,
+      variant: variantData.variant,
+      symbol: monster.symbol,
+      color: monster.color,
+      baseLevel: monster['base-level'],
+      difficulty: monster.difficulty,
+      speed: monster.speed,
+      ac: monster.ac,
+      mr: monster.mr,
+      alignment: monster.alignment,
+      weight: monster.weight,
+      nutrition: monster.nutrition,
+      size: monster.size,
+      generates: monster.generates,
+      notGeneratedNormally: monster['not-generated-normally'] === 'No',
+      appearsInSmallGroups: monster['appears-in-small-groups'] === 'Yes',
+      appearsInLargeGroups: monster['appears-in-large-groups'] === 'Yes',
+      leavesCorpse: monster['leaves-corpse'] === 'Yes' ? true : monster['leaves-corpse'] === 'No' ? false : undefined,
+      genocidable: monster.genocidable === 'Yes' ? true : monster.genocidable === 'No' ? false : undefined,
+      tileImage,
     }
 
-    return { text: result, images }
+    // 攻击列表
+    if (monster.attacks && Array.isArray(monster.attacks)) {
+      cardData.attacks = monster.attacks.map((atk: any[]) => ({
+        atkType: translation.translateAttackType(atk[0]) || atk[0],
+        dmgType: translation.translateDamageType(atk[1]) || atk[1],
+        numDice: atk[2],
+        sizeDice: atk[3],
+      }))
+    }
+
+    // 标志
+    if (monster.flags && Array.isArray(monster.flags)) {
+      cardData.flags = monster.flags.map((f: string) => translation.translateFlag(f) || f)
+    }
+
+    // 渲染图鉴卡片
+    const cardBuffer = await renderMonsterCard(cardData, this.dataPath)
+    return { text: null, images: [cardBuffer] }
   }
 }

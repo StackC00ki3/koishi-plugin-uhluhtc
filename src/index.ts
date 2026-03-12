@@ -79,13 +79,8 @@ export async function apply(ctx: Context, config: Config) {
     if (content.startsWith('#') && content.includes('?') && content.length > 2) {
       const result = await monsterDB.queryMonster(content, translation)
       if (result.images && result.images.length > 0) {
-        const imageBuffers: Buffer[] = result.images
-        const imgElement = imageBuffers.length === 4
-          ? h.image(await Tiles.merge2x2(imageBuffers), 'image/png')
-          : imageBuffers.map((img) => h.image(img, 'image/png')).join('')
-        const elements: (string | typeof imgElement)[] = [imgElement]
-        if (result.text) elements.push(result.text)
-        return elements.join('')
+        // 卡片图片直接发送（单张）
+        return h.image(result.images[0], 'image/png')
       } else if (result.text) {
         return result.text
       }
