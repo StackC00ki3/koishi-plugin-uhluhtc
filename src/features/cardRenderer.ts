@@ -51,28 +51,19 @@ const C = {
 const CARD_W = 360
 const PAD = 16
 
-/** 注册字体（如果系统中有的话），否则使用默认字体 */
+/** 注册字体，优先使用包自带字体 */
 function tryRegisterFont(dir: string) {
-  // 尝试注册 Windows 常见中文字体
-  const fonts = [
-    ['C:\\Windows\\Fonts\\msyh.ttc', 'Microsoft YaHei'],
-    ['C:\\Windows\\Fonts\\simhei.ttf', 'SimHei'],
-    ['C:\\Windows\\Fonts\\simsun.ttc', 'SimSun'],
+  const fontsDir = path.join(dir || __dirname, 'fonts')
+  const bundled = [
+    ['msyh.ttc', 'Microsoft YaHei'],
+    ['simhei.ttf', 'SimHei'],
+    ['simsun.ttc', 'SimSun'],
+    ['JetBrainsMono-Regular.ttf', 'JetBrains Mono'],
   ]
-  for (const [fp, family] of fonts) {
+  for (const [file, family] of bundled) {
+    const fp = path.join(fontsDir, file)
     if (fs.existsSync(fp)) {
       try { GlobalFonts.registerFromPath(fp, family) } catch { /* ignore */ }
-    }
-  }
-  // 项目自带字体
-  if (dir) {
-    const local = path.join(dir, 'fonts')
-    if (fs.existsSync(local)) {
-      for (const f of fs.readdirSync(local)) {
-        if (f.endsWith('.ttf') || f.endsWith('.otf')) {
-          try { GlobalFonts.registerFromPath(path.join(local, f), 'CustomFont') } catch { /* ignore */ }
-        }
-      }
     }
   }
 }

@@ -501,7 +501,7 @@ export class Tiles {
 
         // 彩色字符
         ctx.fillStyle = SYM_COLORS[color.toLowerCase()] ?? '#AAAAAA'
-        ctx.font = '18px monospace'
+        ctx.font = '18px "Microsoft YaHei", "SimHei", sans-serif'
         ctx.textBaseline = 'alphabetic'
 
         const metrics = ctx.measureText(sym)
