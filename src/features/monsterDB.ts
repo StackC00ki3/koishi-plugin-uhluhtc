@@ -2,6 +2,7 @@ import * as yaml from 'js-yaml'
 import * as fs from 'fs'
 import * as path from 'path'
 import { Translation } from './translation'
+import { Tiles } from './tiles'
 import { Logger } from 'koishi'
 
 interface MonsterData {
@@ -18,7 +19,11 @@ interface MonsterData {
 export class MonsterDB {
   private db: MonsterData[] = []
 
-  constructor(private dataPath: string, private logger: Logger) {
+  constructor(
+    private dataPath: string,
+    private logger: Logger,
+    private tiles?: Tiles,
+  ) {
     this.loadDatabase()
   }
 
@@ -50,11 +55,16 @@ export class MonsterDB {
     const monEnName = translation.getEnglishName(monName)
 
     if (monEnName) {
-      // 中文名查询，返回图片（如果有实现）
-      return {
-        text: `${monName}:`,
-        images: [] // TODO: 实现图片生成
+      // 中文名查询：优先从 tileset 获取贴图，无贴图时尝试 wiki
+      let images: Buffer[] = this.tiles?.genImage(monEnName) ?? []
+      if (images.length === 0 && this.tiles) {
+        try {
+          images = [await this.tiles.genWikiImage(monEnName)]
+        } catch {
+          // wiki 不可用时静默忽略
+        }
       }
+      return { text: `${monName}:`, images }
     } else {
       // 英文名查询，搜索所有分支
       let result = `怪物 ${monName} 存在于以下分支:\n`
@@ -172,9 +182,12 @@ export class MonsterDB {
       result += '不可灭绝\n'
     }
 
-    return {
-      text: result,
-      image: null // TODO: 实现符号图片生成
+    // 优先从 tileset 取贴图，无贴图时用符号图片
+    let images: Buffer[] = this.tiles?.genImage(name) ?? []
+    if (images.length === 0 && this.tiles && monster.symbol) {
+      images = [this.tiles.genSymImage(monster.symbol, monster.color ?? 'white')]
     }
+
+    return { text: result, images }
   }
 }

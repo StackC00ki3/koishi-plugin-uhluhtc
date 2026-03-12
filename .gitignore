@@ -1,2 +1,13 @@
+# --- 依赖与包管理器 ---
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# --- 编译产物 (TypeScript/Build) ---
+lib/
+dist/
+*.tsbuildinfo
+
 *.md
 *.ps1

@@ -1,6 +1,7 @@
 import { Context, Schema, h } from 'koishi'
 import { MonsterDB } from './features/monsterDB'
 import { Translation } from './features/translation'
+import { Tiles } from './features/tiles'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -14,7 +15,7 @@ export const Config: Schema<Config> = Schema.object({
   dataPath: Schema.string().description('怪物数据库文件路径').default('./data/uhluhtc'),
 })
 
-export function apply(ctx: Context, config: Config) {
+export async function apply(ctx: Context, config: Config) {
   const dataPath = config.dataPath || path.join(ctx.baseDir, 'data', 'uhluhtc')
 
   // 确保数据目录存在
@@ -24,8 +25,12 @@ export function apply(ctx: Context, config: Config) {
     ctx.logger.warn('请从 https://github.com/UnNetHack/pinobot/tree/master/variants 下载怪物数据文件到该目录')
   }
 
-  const monsterDB = new MonsterDB(dataPath, ctx.logger)
-  const translation = new Translation(ctx.logger)
+  const logger = ctx.logger('uhluhtc')
+  const tiles = new Tiles(dataPath, logger)
+  await tiles.init()
+
+  const monsterDB = new MonsterDB(dataPath, logger, tiles)
+  const translation = new Translation(logger)
 
   ctx.logger.info(`已加载 ${monsterDB.getVariantCount()} 个变体的怪物数据库`)
 
@@ -50,8 +55,12 @@ export function apply(ctx: Context, config: Config) {
 
       if (result.images && result.images.length > 0) {
         // 发送图片和文本
-        const elements = result.images.map(img => h.image(img))
-        elements.push(result.text || monName)
+        const imageBuffers: Buffer[] = result.images
+        const imgElement = imageBuffers.length === 4
+          ? h.image(await Tiles.merge2x2(imageBuffers), 'image/png')
+          : imageBuffers.map((img) => h.image(img, 'image/png')).join('')
+        const elements: (string | typeof imgElement)[] = [imgElement]
+        if (result.text) elements.unshift(result.text)
         return elements.join('')
       } else if (result.text) {
         return result.text
@@ -69,8 +78,14 @@ export function apply(ctx: Context, config: Config) {
     // 查询怪物详细信息 #variant?monster
     if (content.startsWith('#') && content.includes('?') && content.length > 2) {
       const result = await monsterDB.queryMonster(content, translation)
-      if (result.image) {
-        return h.image(result.image) + (result.text || '')
+      if (result.images && result.images.length > 0) {
+        const imageBuffers: Buffer[] = result.images
+        const imgElement = imageBuffers.length === 4
+          ? h.image(await Tiles.merge2x2(imageBuffers), 'image/png')
+          : imageBuffers.map((img) => h.image(img, 'image/png')).join('')
+        const elements: (string | typeof imgElement)[] = [imgElement]
+        if (result.text) elements.push(result.text)
+        return elements.join('')
       } else if (result.text) {
         return result.text
       }

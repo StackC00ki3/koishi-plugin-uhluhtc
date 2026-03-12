@@ -45,10 +45,25 @@ export class Translation {
   }
 
 
+  private isChinese(text: string): boolean {
+    return /[\u4e00-\u9fff]/.test(text)
+  }
+
   translateMonsterNames(text: string): string {
+    if (this.isChinese(text)) {
+      return this.translateMonsterNamesToEnglish(text)
+    }
     let result = text
     for (const [en, zh] of this.monTranslation) {
       result = result.replace(new RegExp(en, 'gi'), zh)
+    }
+    return result
+  }
+
+  translateMonsterNamesToEnglish(text: string): string {
+    let result = text
+    for (const [zh, en] of this.reverseMonTranslation) {
+      result = result.replace(new RegExp(zh, 'g'), en)
     }
     return result
   }
