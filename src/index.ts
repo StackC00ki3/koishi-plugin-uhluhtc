@@ -2,6 +2,7 @@ import { Context, Schema, h } from 'koishi'
 import { MonsterDB } from './features/monsterDB'
 import { Translation } from './features/translation'
 import { Tiles } from './features/tiles'
+import { initializeCardRendererFonts } from './features/cardRenderer'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -19,6 +20,10 @@ export const Config: Schema<Config> = Schema.object({
 
 export async function apply(ctx: Context, config: Config) {
   const logger = ctx.logger('uhluhtc')
+
+  // 在插件启动时初始化字体，避免首次渲染卡片时才加载。
+  const loadedFontCount = initializeCardRendererFonts(path.join(__dirname, '..', 'fonts'))
+  logger.info(`卡片渲染字体初始化完成，已加载 ${loadedFontCount} 个字体`)
 
   let monsterDBDataPath: string
   let tilesDataPath: string

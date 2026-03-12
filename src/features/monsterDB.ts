@@ -229,7 +229,7 @@ export class MonsterDB {
     }
 
     // 渲染图鉴卡片
-    const cardBuffer = await renderMonsterCard(cardData, this.dataPath)
+    const cardBuffer = await renderMonsterCard(cardData)
     return { text: null, images: [cardBuffer] }
   }
 }

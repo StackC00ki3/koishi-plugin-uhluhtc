@@ -50,31 +50,34 @@ const C = {
 
 const CARD_W = 360
 const PAD = 16
-
-/** 注册字体，优先使用包自带字体 */
-function tryRegisterFont(dir: string) {
-  const fontsDir = path.join(dir || __dirname, 'fonts')
-  const bundled = [
-    ['msyh.ttc', 'Microsoft YaHei'],
-    ['simhei.ttf', 'SimHei'],
-    ['simsun.ttc', 'SimSun'],
-    ['JetBrainsMono-Regular.ttf', 'JetBrains Mono'],
-  ]
-  for (const [file, family] of bundled) {
-    const fp = path.join(fontsDir, file)
-    if (fs.existsSync(fp)) {
-      try { GlobalFonts.registerFromPath(fp, family) } catch { /* ignore */ }
-    }
-  }
-}
-
 let fontsRegistered = false
 
-export async function renderMonsterCard(data: MonsterCardData, dataDir?: string): Promise<Buffer> {
-  if (!fontsRegistered) {
-    tryRegisterFont(dataDir || '')
-    fontsRegistered = true
-  }
+/** 在插件启动时调用一次，避免首次渲染时才注册字体 */
+export function initializeCardRendererFonts(fontsDir: string): number {
+    if (fontsRegistered)
+        return 0;
+    let loaded = 0;
+    const bundled = [
+        ['msyh.ttc', 'Microsoft YaHei'],
+        ['simhei.ttf', 'SimHei'],
+        ['simsun.ttc', 'SimSun'],
+        ['JetBrainsMono-Regular.ttf', 'JetBrains Mono'],
+    ];
+    for (const [file, family] of bundled) {
+        const fp = path.join(fontsDir, file);
+        if (fs.existsSync(fp)) {
+            try {
+                GlobalFonts.registerFromPath(fp, family);
+                loaded++;
+            }
+            catch { /* ignore */ }
+        }
+    }
+    fontsRegistered = true;
+    return loaded;
+}
+
+export async function renderMonsterCard(data: MonsterCardData): Promise<Buffer> {
 
   // ── 预先计算动态高度 ─────────────────────────────────────────────────────
   const rows = buildRows(data)
