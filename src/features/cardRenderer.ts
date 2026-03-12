@@ -93,8 +93,16 @@ export async function renderMonsterCard(data: MonsterCardData, dataDir?: string)
   const rowsTotalH = rows.length * rowH
   const flagsH = data.flags && data.flags.length > 0 ? estimateFlagsH(data.flags, CARD_W - PAD * 2) : 0
   const atkH = data.attacks && data.attacks.length > 0 ? data.attacks.length * rowH + 4 : 0
+  const genParts: string[] = []
+  if (data.genocidable === false) genParts.push('不可灭绝')
+  if (data.notGeneratedNormally) genParts.push('不随机生成')
+  if (data.appearsInSmallGroups) genParts.push('成群出现')
+  if (data.appearsInLargeGroups) genParts.push('成大群出现')
+  if (data.leavesCorpse === false) genParts.push('不留尸体')
+  const hasGenSection = !!data.generates || genParts.length > 0
+  const genSectionH = hasGenSection ? (10 + (data.generates ? rowH : 0) + (genParts.length > 0 ? 22 : 0) + 8) : 0
   const footerH = 28
-  const CARD_H = headerH + tileAreaH + 12 + rowsTotalH + flagsH + atkH + footerH + PAD * 3
+  const CARD_H = headerH + tileAreaH + 12 + rowsTotalH + genSectionH + flagsH + atkH + footerH + PAD * 3
 
   const canvas = createCanvas(CARD_W, CARD_H)
   const ctx = canvas.getContext('2d')
@@ -180,6 +188,24 @@ export async function renderMonsterCard(data: MonsterCardData, dataDir?: string)
     y += rowH
   }
 
+  // ── 生成信息 ──────────────────────────────────────────────────────────────
+  if (hasGenSection) {
+    drawDivider(ctx, PAD, y, CARD_W - PAD * 2, C.divider)
+    y += 10
+    if (data.generates) {
+      drawStatRow(ctx, PAD, y, CARD_W - PAD * 2, '生成于', data.generates)
+      y += rowH
+    }
+    if (genParts.length > 0) {
+      ctx.font = `11px "Microsoft YaHei", "SimHei", sans-serif`
+      ctx.fillStyle = C.subtitle
+      ctx.textAlign = 'center'
+      ctx.fillText(genParts.join('  ·  '), CARD_W / 2, y + 14)
+      y += 22
+    }
+    y += 8
+  }
+
   // ── 攻击 ──────────────────────────────────────────────────────────────────
   if (data.attacks && data.attacks.length > 0) {
     y += 4
@@ -210,22 +236,6 @@ export async function renderMonsterCard(data: MonsterCardData, dataDir?: string)
     y += 6
   }
 
-  // ── 底部 ──────────────────────────────────────────────────────────────────
-  drawDivider(ctx, PAD, y, CARD_W - PAD * 2, C.divider)
-  y += 6
-  ctx.font = `11px "Microsoft YaHei", "SimHei", sans-serif`
-  ctx.fillStyle = C.subtitle
-  ctx.textAlign = 'center'
-  const footerParts: string[] = []
-  if (data.genocidable === false) footerParts.push('不可灭绝')
-  if (data.notGeneratedNormally) footerParts.push('不随机生成')
-  if (data.appearsInSmallGroups) footerParts.push('成群出现')
-  if (data.appearsInLargeGroups) footerParts.push('成大群出现')
-  if (data.leavesCorpse === false) footerParts.push('不留尸体')
-  if (footerParts.length > 0) {
-    ctx.fillText(footerParts.join('  ·  '), CARD_W / 2, y + 14)
-    y += 18
-  }
 
   return canvas.toBuffer('image/png')
 }
@@ -237,13 +247,12 @@ function buildRows(data: MonsterCardData): Array<{ label: string; value: string;
   if (data.baseLevel !== undefined) rows.push({ label: '基础等级', value: String(data.baseLevel) })
   if (data.difficulty !== undefined) rows.push({ label: '难度', value: String(data.difficulty) })
   if (data.speed !== undefined) rows.push({ label: '速度', value: String(data.speed) })
-  if (data.ac !== undefined) rows.push({ label: 'AC（护甲级）', value: String(data.ac), highlight: true })
+  if (data.ac !== undefined) rows.push({ label: 'AC', value: String(data.ac), highlight: true })
   if (data.mr !== undefined) rows.push({ label: '魔法抗性', value: `${data.mr}%`, highlight: data.mr > 50 })
   if (data.alignment !== undefined) rows.push({ label: '阵营', value: alignmentLabel(data.alignment) })
   if (data.size) rows.push({ label: '体型', value: data.size })
   if (data.weight !== undefined) rows.push({ label: '重量', value: String(data.weight) })
   if (data.nutrition !== undefined) rows.push({ label: '营养价值', value: String(data.nutrition) })
-  if (data.generates) rows.push({ label: '生成于', value: data.generates })
 
   return rows
 }
