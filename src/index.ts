@@ -59,7 +59,27 @@ export async function apply(ctx: Context, config: Config) {
       return '功能：\n' +
         '1.辅助龙龙: 查询怪物[中文] 发送怪物贴图 ; 查询怪物[英文] 在所有nh分支中搜索该怪物并发送可选列表\n' +
         '2.翻译消息中的怪物名称: 翻译[需要翻译的内容(可包含不是怪物名的内容)]\n' +
-        '3.查询怪物详细信息： #[分支简称]?[英文怪兽名] （分支简称可用查询怪物[英文]来获取）'
+        '3.查询怪物详细信息： #[分支简称]?[英文怪兽名] （分支简称可用查询怪物[英文]来获取）\n' +
+        '4.生成 nethack 怪物赛跑 GIF：怪物赛跑 [怪物1,怪物2,...]（默认 v 分支，可写 分支?怪物名）'
+    })
+
+  // 怪物赛跑 GIF
+  ctx.command('怪物赛跑 <monsters:text>', '生成怪物赛跑 GIF')
+    .action(async (_, monsters) => {
+      if (!monsters) {
+        return '用法：怪物赛跑 [怪物1,怪物2,...]（默认 v 分支，可写 分支?怪物名）'
+      }
+      const names = monsters
+        .split(/[，,\n]+/)
+        .map(s => s.trim())
+        .filter(Boolean)
+
+      const result = await monsterDB.generateRaceGif(names, translation)
+      if (result.gif) {
+        return `${h.image(result.gif, 'image/gif')}`
+      }else{
+        return result.text
+      }
     })
 
   // 查询怪物贴图

@@ -4,6 +4,7 @@ import * as path from 'path'
 import { Translation } from './translation'
 import { Tiles } from './tiles'
 import { renderMonsterCard, MonsterCardData } from './cardRenderer'
+import { renderMonsterRaceGif, RaceParticipant } from './raceRenderer'
 import { Logger } from 'koishi'
 
 interface MonsterData {
@@ -52,6 +53,102 @@ export class MonsterDB {
     return this.db.length
   }
 
+  private findVariant(variant: string): MonsterData | undefined {
+    const key = variant.toLowerCase()
+    return this.db.find(v =>
+      (v.prefix && v.prefix.toLowerCase() === key)
+      || (v.variant && v.variant.toLowerCase() === key)
+    )
+  }
+
+  private resolveMonster(variantData: MonsterData, monName: string, translation: Translation) {
+    const monsters = variantData.monsters || []
+    const searchName = monName.toLowerCase()
+    const translatedName = translation.getEnglishName(monName)?.toLowerCase()
+    return monsters.find(m => {
+      const name = m.name?.toLowerCase()
+      return name === searchName || name === translatedName
+    })
+  }
+
+  async generateRaceGif(names: string[], translation: Translation) {
+    if (names.length < 2) {
+      return { text: '请至少提供 2 个怪物名。示例：怪物赛跑 fox,wolf,dog（可写 unnh?fox）' }
+    }
+
+    const participants: RaceParticipant[] = []
+    const notFound: string[] = []
+    const used = new Set<string>()
+    const palette = ['#ff6f61', '#66d9ef', '#ffd166', '#9ef01a', '#f7a6ff', '#f28482', '#8ecae6', '#f6bd60']
+
+    for (let i = 0; i < names.length; i++) {
+      const rawName = names[i].trim()
+      if (!rawName) continue
+
+      const raceMatch = rawName.match(/^([^?]+)\?(.+)$/)
+      const variantKey = raceMatch ? raceMatch[1].trim() : 'v'
+      const monsterName = raceMatch ? raceMatch[2].trim() : rawName
+      if (!monsterName) {
+        notFound.push(rawName)
+        continue
+      }
+
+      const variantData = this.findVariant(variantKey)
+      if (!variantData) {
+        notFound.push(rawName)
+        continue
+      }
+
+      const monster = this.resolveMonster(variantData, monsterName, translation)
+      if (!monster || !monster.name) {
+        notFound.push(rawName)
+        continue
+      }
+
+      const dedupeKey = `${variantKey.toLowerCase()}?${monster.name.toLowerCase()}`
+      if (used.has(dedupeKey)) {
+        continue
+      }
+      used.add(dedupeKey)
+
+      let avatar: Buffer | undefined
+      if (this.tiles) {
+        const images = this.tiles.genImage(monster.name)
+        if (images.length > 0) {
+          avatar = images[Math.random() * images.length | 0]
+        }
+      }
+      if (!avatar && this.tiles && monster.symbol) {
+        avatar = this.tiles.genSymImage(monster.symbol, monster.color ?? 'white')
+      }
+
+      participants.push({
+        name: monster.name,
+        displayName: translation.getChineseName(monster.name) || monster.name,
+        speed: Number(monster.speed) || 12,
+        avatar: avatar ?? Buffer.alloc(0),
+        color: palette[i % palette.length],
+      })
+    }
+
+    if (participants.length < 2) {
+      const nf = notFound.length > 0 ? ` 未找到：${notFound.join('、')}` : ''
+      return { text: `有效参赛怪物不足 2 个。${nf}`.trim() }
+    }
+
+    const raceResult = await renderMonsterRaceGif(participants)
+    const rankText = raceResult.ranking
+      .map((r, idx) => `${idx + 1}. ${r.displayName} (速度${r.speed})`)
+      .join('\n')
+
+    const extra = notFound.length > 0 ? `\n未找到：${notFound.join('、')}` : ''
+
+    return {
+      gif: raceResult.gif,
+      text: `赛跑完成，排行榜：\n${rankText}${extra}`,
+    }
+  }
+
   async searchMonster(monName: string, translation: Translation) {
     const monEnName = translation.getEnglishName(monName)
 
@@ -98,7 +195,7 @@ export class MonsterDB {
     const [, variant, monName] = match
     this.logger.debug(`查询: variant=${variant}, monName=${monName}`)
 
-    const variantData = this.db.find(v => v.prefix === variant)
+    const variantData = this.findVariant(variant)
     if (!variantData) {
       return { text: '未找到该分支' }
     }
