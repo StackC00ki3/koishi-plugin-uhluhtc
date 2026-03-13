@@ -474,14 +474,15 @@ export class Tiles {
         if (idx === -1 || this.tilesets.length === 0) return []
 
         return this.tilesets.map(tileset => {
-            const tilesInLine = Math.floor(tileset.width / 32)
+            const tilesInLine = 40
+            const tileSize = Math.floor(tileset.width / tilesInLine) || 32
             const tileY = Math.floor(idx / tilesInLine)
             const tileX = idx - tileY * tilesInLine
 
             const tile = createCanvas(32, 32)
             tile.getContext('2d').drawImage(
                 tileset,
-                tileX * 32, tileY * 32, 32, 32,
+                tileX * tileSize, tileY * tileSize, tileSize, tileSize,
                 0, 0, 32, 32,
             )
             return tile.toBuffer('image/png')
