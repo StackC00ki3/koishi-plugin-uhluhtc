@@ -9,6 +9,14 @@
     "dist",
     "resources"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/StackC00ki3/koishi-plugin-uhluhtc.git"
+  },
+  "homepage": "https://github.com/StackC00ki3/koishi-plugin-uhluhtc#readme",
+  "bugs": {
+    "url": "https://github.com/StackC00ki3/koishi-plugin-uhluhtc/issues"
+  },
   "license": "MIT",
   "scripts": {},
   "keywords": [
