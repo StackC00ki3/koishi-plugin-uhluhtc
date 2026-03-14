@@ -22,7 +22,7 @@ export async function apply(ctx: Context, config: Config) {
   const logger = ctx.logger('uhluhtc')
 
   // 在插件启动时初始化字体，避免首次渲染卡片时才加载。
-  const loadedFontCount = initializeCardRendererFonts(path.join(__dirname, '..', 'fonts'))
+  const loadedFontCount = initializeCardRendererFonts(path.join(__dirname, '..', 'resources', 'fonts'))
   logger.info(`卡片渲染字体初始化完成，已加载 ${loadedFontCount} 个字体`)
 
   let monsterDBDataPath: string
@@ -30,8 +30,8 @@ export async function apply(ctx: Context, config: Config) {
 
   if (config.useBuiltinData !== false) {
     // 使用 package 自带数据
-    monsterDBDataPath = path.join(__dirname, '../monsterDB')
-    tilesDataPath = path.join(__dirname, '..')
+    monsterDBDataPath = path.join(__dirname, '..', 'resources', 'monsterDB')
+    tilesDataPath = path.join(__dirname, '..', 'resources')
     logger.info('使用自带数据')
   } else {
     const dataPath = config.dataPath || path.join(ctx.baseDir, 'data', 'uhluhtc')

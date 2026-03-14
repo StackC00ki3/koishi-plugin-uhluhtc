@@ -7,10 +7,7 @@
   "files": [
     "lib",
     "dist",
-    "fonts",
-    "monsterDB",
-    "tilesets",
-    "locales"
+    "resources"
   ],
   "license": "MIT",
   "scripts": {},

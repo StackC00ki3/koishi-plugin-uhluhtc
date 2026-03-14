@@ -1,5 +1,5 @@
 import { Logger } from 'koishi'
-import builtinData from '../../locales/zh-CN.json'
+import builtinData from '../../resources/locales/zh-CN.json'
 
 interface TranslationData {
   monsters?: Record<string, string>
