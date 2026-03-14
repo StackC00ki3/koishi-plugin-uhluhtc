@@ -12,7 +12,7 @@ NetHack information query plugin for Koishi
 - [x] 支持检索 nethack分支的怪物
 - [x] 支持生成怪物赛跑 GIF
 - [ ] 神谕 (龙龙) 
-- [ ] 幸运🍪 (乐九,龙龙)
+- [x] 幸运🍪 (乐九,龙龙)
 - [ ] nh小贴士 (龙龙)
 - [ ] 漂流瓶 (乐九,龙龙)
 
@@ -93,6 +93,20 @@ NetHack information query plugin for Koishi
 
 - 怪物赛跑 狐狸,wolf,dog
 - 怪物赛跑 u?fox,v?wolf,x?dog
+
+### 7. 幸运饼干
+
+- 幸运饼干
+
+别名：
+
+- 幸运曲奇
+- 吃饼干
+- 吃曲奇
+
+行为：
+
+- 抽取幸运饼干签文
 
 ## 分支简称
 

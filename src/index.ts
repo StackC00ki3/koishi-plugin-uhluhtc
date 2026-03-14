@@ -51,16 +51,43 @@ export async function apply(ctx: Context, config: Config) {
   const monsterDB = new MonsterDB(monsterDBDataPath, logger, tiles)
   const translation = new Translation(logger)
 
+  const fortuneCookiesPath = path.join(__dirname, '..', 'resources', 'fortune_cookies')
+  const falseLines = fs.readFileSync(path.join(fortuneCookiesPath, 'fal.txt'), 'utf-8')
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean)
+  const trueLines = fs.readFileSync(path.join(fortuneCookiesPath, 'tru.txt'), 'utf-8')
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean)
+
   logger.info(`已加载 ${monsterDB.getVariantCount()} 个变体的怪物数据库`)
 
   // 帮助命令
   ctx.command('卢克', '显示 uhluhtc 插件帮助信息')
     .action(() => {
       return '功能：\n' +
-        '1.辅助龙龙: 查询怪物[中文] 发送怪物贴图 ; 查询怪物[英文] 在所有nh分支中搜索该怪物并发送可选列表\n' +
-        '2.翻译消息中的怪物名称: 翻译[需要翻译的内容(可包含不是怪物名的内容)]\n' +
+        '1.查询怪物[中文] 发送怪物图鉴 ; 查询怪物[英文] 在所有nh分支中搜索该怪物并发送可选列表\n' +
+        '2.翻译消息中的怪物名称: 翻译 [需要翻译的内容]\n' +
         '3.查询怪物详细信息： #[分支简称]?[英文怪兽名] （分支简称可用查询怪物[英文]来获取）\n' +
-        '4.生成 nethack 怪物赛跑 GIF：怪物赛跑 [怪物1,怪物2,...]（默认 v 分支，可写 分支?怪物名）'
+        '4.生成 nethack 怪物赛跑 GIF：怪物赛跑 [怪物1,怪物2,...]（默认原版，可写 分支?怪物名）\n' +
+        '5.幸运饼干（别名：幸运曲奇/吃饼干/吃曲奇）: 抽取幸运饼干签文'
+    })
+
+  // 幸运饼干
+  ctx.command('幸运饼干', '抽取幸运饼干签文')
+    .alias('吃饼干')
+    .alias('幸运曲奇')
+    .alias('吃曲奇')
+    .action(() => {
+      const isTruth = Math.random() < 0.5
+      const source = isTruth ? trueLines : falseLines
+      if (source.length === 0) {
+        return '幸运饼干暂时空了。'
+      }
+      const line = source[Math.floor(Math.random() * source.length)]
+      const suffix = isTruth ? '当然' : '并非'
+      return `你想来一块幸运饼干？\n饼干里有一张废纸：${line}（${suffix}）`
     })
 
   // 怪物赛跑 GIF
