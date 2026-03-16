@@ -11,7 +11,7 @@ NetHack information query plugin for Koishi
 - [x] 支持 nethack 中英怪物名互译
 - [x] 支持检索 nethack分支的怪物
 - [x] 支持生成怪物赛跑 GIF
-- [ ] 神谕 (龙龙) 
+- [x] 神谕 (龙龙) 
 - [x] 幸运🍪 (乐九,龙龙)
 - [ ] nh小贴士 (龙龙)
 - [ ] 漂流瓶 (乐九,龙龙)
@@ -107,6 +107,15 @@ NetHack information query plugin for Koishi
 行为：
 
 - 抽取幸运饼干签文
+
+### 8. 神谕
+
+- 神谕
+
+行为：
+
+- 抽取一条神谕文本
+
 
 ## 分支简称
 

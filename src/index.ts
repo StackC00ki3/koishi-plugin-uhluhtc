@@ -61,7 +61,18 @@ export async function apply(ctx: Context, config: Config) {
     .map(line => line.trim())
     .filter(Boolean)
 
+  const oraclePath = path.join(__dirname, '..', 'resources', 'oracle', 'ora.txt')
+  const oracleLines = fs.existsSync(oraclePath)
+    ? fs.readFileSync(oraclePath, 'utf-8')
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(Boolean)
+    : []
+
   logger.info(`已加载 ${monsterDB.getVariantCount()} 个变体的怪物数据库`)
+  logger.info(`已加载 ${tiles.tilesetCount} 个图块集`)
+  logger.info(`已加载 ${trueLines.length} 条幸运饼干真签文，${falseLines.length} 条假签文`)
+  logger.info(`已加载 ${oracleLines.length} 条神谕文本`)
 
   // 帮助命令
   ctx.command('卢克', '显示 uhluhtc 插件帮助信息')
@@ -71,7 +82,8 @@ export async function apply(ctx: Context, config: Config) {
         '2.翻译消息中的怪物名称: 翻译 [需要翻译的内容]\n' +
         '3.查询怪物详细信息： #[分支简称]?[英文怪兽名] （分支简称可用查询怪物[英文]来获取）\n' +
         '4.生成 nethack 怪物赛跑 GIF：怪物赛跑 [怪物1,怪物2,...]（默认原版，可写 分支?怪物名）\n' +
-        '5.幸运饼干（别名：幸运曲奇/吃饼干/吃曲奇）: 抽取幸运饼干签文'
+        '5.幸运饼干（别名：幸运曲奇/吃饼干/吃曲奇）: 抽取幸运饼干签文\n' +
+        '6.神谕: 抽取神谕文本'
     })
 
   // 幸运饼干
@@ -88,6 +100,16 @@ export async function apply(ctx: Context, config: Config) {
       const line = source[Math.floor(Math.random() * source.length)]
       const suffix = isTruth ? '当然' : '并非'
       return `你想来一块幸运饼干？\n饼干里有一张废纸：${line}（${suffix}）`
+    })
+
+  // 神谕
+  ctx.command('神谕', '抽取神谕文本')
+    .action(() => {
+      if (oracleLines.length === 0) {
+        return '神谕暂时无法回应。'
+      }
+      const line = oracleLines[Math.floor(Math.random() * oracleLines.length)]
+      return line
     })
 
   // 怪物赛跑 GIF
