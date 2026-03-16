@@ -13,7 +13,7 @@ NetHack information query plugin for Koishi
 - [x] 支持生成怪物赛跑 GIF
 - [x] 神谕 (龙龙) 
 - [x] 幸运🍪 (乐九,龙龙)
-- [ ] nh小贴士 (龙龙)
+- [x] nh小贴士 (龙龙)
 - [ ] 漂流瓶 (乐九,龙龙)
 
 ## 安装
@@ -116,6 +116,14 @@ NetHack information query plugin for Koishi
 
 - 抽取一条神谕文本
 
+### 9. nh小贴士
+
+行为：
+
+- 当聊天消息命中内置 tips 关键词后，开始倒计时 10 分钟
+- 若 10 分钟内该会话无人发言，自动推送一条命中关键词的小贴士
+- 若命中多条，则随机抽取一条发送
+
 
 ## 分支简称
 
@@ -150,6 +158,7 @@ NetHack information query plugin for Koishi
 
 - useBuiltinData: 是否使用内置数据库，默认 true
 - dataPath: 自定义数据库目录，默认 ./data/uhluhtc（仅在 useBuiltinData 为 false 时生效）
+- enabledGroupIds: 生效QQ群号白名单（字符串数组），留空表示全部群聊生效
 
 说明：
 
