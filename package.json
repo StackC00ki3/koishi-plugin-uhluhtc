@@ -1,7 +1,7 @@
 {
   "name": "koishi-plugin-uhluhtc",
   "description": "NetHack information query plugin for Koishi",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [
@@ -18,7 +18,9 @@
     "url": "https://github.com/StackC00ki3/koishi-plugin-uhluhtc/issues"
   },
   "license": "MIT",
-  "scripts": {},
+  "scripts": {
+    "extract:tips-keywords": "node scripts/extract-tip-keywords.js"
+  },
   "keywords": [
     "chatbot",
     "koishi",
@@ -31,8 +33,7 @@
     "@napi-rs/canvas": "^0.1.96",
     "axios": "^1.6.0",
     "gif-encoder-2": "^1.0.5",
-    "js-yaml": "^4.1.0",
-    "nodejieba": "^3.5.7"
+    "js-yaml": "^4.1.0"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",

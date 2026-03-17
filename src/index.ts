@@ -6,8 +6,6 @@ import { initializeCardRendererFonts } from './features/cardRenderer'
 import * as fs from 'fs'
 import * as path from 'path'
 
-const nodejieba = require('nodejieba')
-
 export const name = 'uhluhtc'
 
 export interface Config {
@@ -31,62 +29,6 @@ export async function apply(ctx: Context, config: Config) {
     const guildId = session.guildId?.trim()
     if (!guildId) return false
     return enabledGroupIds.has(guildId)
-  }
-
-  const extractChineseKeywords = (line: string): string[] => {
-    const stopWords = new Set([
-      '如果', '可以', '不要', '记得', '时候', '里面', '自己', '没有', '不会', '这个', '那个',
-      '就是', '还有', '很多', '一下', '一些', '我们', '你们', '他们', '因为', '所以', '然后',
-      '但是', '而且', '以及', '或者', '只是', '真的', '非常', '已经', '还是', '不是', '一个',
-      '这种', '那种', '这里', '那里', '需要', '应该', '可能', '必须', '建议', '尝试', '据说',
-      '听说', '这样', '那样',
-    ])
-
-    const normalized = line
-      .replace(/[“”"'`＊*()（）\[\]{}<>《》【】,:：;；.!！？?、\\/\-—~～…·]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-
-    if (!normalized) return []
-
-    const pickRandom = (words: string[], count: number): string[] => {
-      const pool = [...words]
-      for (let i = pool.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1))
-        const tmp = pool[i]
-        pool[i] = pool[j]
-        pool[j] = tmp
-      }
-      return pool.slice(0, Math.min(count, pool.length))
-    }
-
-    const extracted = nodejieba.extract(normalized, 3)
-    const extractedWords = extracted
-      .map((item: { word: string }) => item.word.trim().replace(/\s+/g, ''))
-      .filter((word: string) => /[\u4e00-\u9fff]/.test(word))
-
-    if (extractedWords.length === 0) {
-      const cutWords = nodejieba.cut(normalized, true)
-        .map((word: string) => word.trim().replace(/\s+/g, ''))
-        .filter((word: string) => /[\u4e00-\u9fff]/.test(word))
-        .filter((word: string) => !stopWords.has(word))
-
-      const uniqueCutWords = Array.from(new Set<string>(cutWords))
-      return pickRandom(uniqueCutWords, 3)
-    }
-
-    const candidates = extractedWords.filter((word: string) => !stopWords.has(word))
-    const selected = candidates.length > 0 ? candidates : extractedWords
-
-    const keywords: string[] = []
-    for (const word of selected) {
-      if (!keywords.includes(word)) {
-        keywords.push(word)
-      }
-      if (keywords.length >= 3) break
-    }
-
-    return keywords
   }
 
   // 在插件启动时初始化字体，避免首次渲染卡片时才加载。
@@ -137,25 +79,29 @@ export async function apply(ctx: Context, config: Config) {
       .filter(Boolean)
     : []
 
-  const tipsPath = path.join(__dirname, '..', 'resources', 'nethack_tips', 'tips.txt')
-  const tipLines = fs.existsSync(tipsPath)
-    ? fs.readFileSync(tipsPath, 'utf-8')
+  const tipKeywordsPath = path.join(__dirname, '..', 'resources', 'nethack_tips', 'keywords.txt')
+  const tipKeywordToLines = new Map<string, string[]>()
+  if (fs.existsSync(tipKeywordsPath)) {
+    const keywordRows = fs.readFileSync(tipKeywordsPath, 'utf-8')
       .split(/\r?\n/)
       .map(line => line.trim())
       .filter(Boolean)
-    : []
 
-  const tipKeywordToLines = new Map<string, string[]>()
-  for (const line of tipLines) {
-    const keywords = extractChineseKeywords(line)
-    logger.info(`[nh小贴士] 关键词提取: ${keywords.length > 0 ? keywords.join(',') : '(空)'} | ${line}`)
-    for (const keyword of keywords) {
+    for (const row of keywordRows) {
+      const [keywordRaw, ...tipParts] = row.split('\t')
+      const keyword = keywordRaw?.trim()
+      const tipLine = tipParts.join('\t').trim()
+      if (!keyword || !tipLine) continue
       if (!tipKeywordToLines.has(keyword)) {
         tipKeywordToLines.set(keyword, [])
       }
-      tipKeywordToLines.get(keyword)!.push(line)
+      tipKeywordToLines.get(keyword)!.push(tipLine)
     }
+  } else {
+    logger.warn(`未找到小贴士关键词文件: ${tipKeywordsPath}`)
   }
+
+  const tipLineCount = new Set(Array.from(tipKeywordToLines.values()).flat()).size
 
   const tipCountdownByChannel = new Map<string, NodeJS.Timeout>()
 
@@ -174,7 +120,7 @@ export async function apply(ctx: Context, config: Config) {
   logger.info(`已加载 ${tiles.tilesetCount} 个图块集`)
   logger.info(`已加载 ${trueLines.length} 条幸运饼干真签文，${falseLines.length} 条假签文`)
   logger.info(`已加载 ${oracleLines.length} 条神谕文本`)
-  logger.info(`已加载 ${tipLines.length} 条地牢小贴士，整理出 ${tipKeywordToLines.size} 个中文关键字`)
+  logger.info(`已加载 ${tipLineCount} 条地牢小贴士，读取 ${tipKeywordToLines.size} 个中文关键字`)
   logger.info(`群号白名单模式: ${enabledGroupIds.size > 0 ? `已启用（${enabledGroupIds.size} 个群）` : '未启用（全部群聊生效）'}`)
 
   // 帮助命令
@@ -300,6 +246,7 @@ export async function apply(ctx: Context, config: Config) {
     const channelId = session.cid || session.channelId || session.guildId || session.userId || `private:${session.platform}`
     const activeTimer = tipCountdownByChannel.get(channelId)
     if (activeTimer) {
+      logger.info(`[nh小贴士] 检测到新消息，取消上一个倒计时，会话=${channelId}`)
       clearTimeout(activeTimer)
       tipCountdownByChannel.delete(channelId)
     }
