@@ -256,9 +256,9 @@ export class MonsterDB {
     // 生成信息
     if (monster.generates) {
       const generates = String(monster.generates)
-        .replace(/\bgehennom\b/gi, '欣嫩谷')
-        .replace(/\bdungeons\b/gi, '命运地牢')
-        .replace(/\bunique\b/gi, '唯一')
+        .replace('gehennom', '欣嫩谷')
+        .replace('dungeons', '命运地牢')
+        .replace('unique', '唯一')
       result += `\n生成于: ${generates}`
     }
     if (monster['not-generated-normally'] === 'No') {
@@ -305,7 +305,10 @@ export class MonsterDB {
       weight: monster.weight,
       nutrition: monster.nutrition,
       size: monster.size,
-      generates: monster.generates,
+      generates: String(monster.generates)
+        .replace('gehennom', '欣嫩谷')
+        .replace('dungeons', '命运地牢')
+        .replace('unique', '唯一'),
       notGeneratedNormally: monster['not-generated-normally'] === 'Yes',
       appearsInSmallGroups: monster['appears-in-small-groups'] === 'Yes',
       appearsInLargeGroups: monster['appears-in-large-groups'] === 'Yes',
