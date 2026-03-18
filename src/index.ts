@@ -25,7 +25,7 @@ export async function apply(ctx: Context, config: Config) {
   const enabledGroupIds = new Set((config.enabledGroupIds || []).map(id => String(id).trim()).filter(Boolean))
 
   const isSessionEnabled = (session: { guildId?: string, userId?: string, platform?: string }): boolean => {
-    if (session.platform === 'sandbox') return true
+    if (session.platform?.includes('sandbox')) return true
     if (enabledGroupIds.size === 0) return true
     const guildId = session.guildId?.trim()
     if (guildId) {

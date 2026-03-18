@@ -84,9 +84,8 @@ export async function renderMonsterCard(data: MonsterCardData): Promise<Buffer> 
   const tileAreaH = 78    // 怪物图片区域高度（60px tile + 上下边距）
   const headerH = 70      // 标题区
   const rowH = 24
-  const rowsTotalH = rows.length * rowH
-  const flagsH = data.flags && data.flags.length > 0 ? estimateFlagsH(data.flags, CARD_W - PAD * 2) : 0
-  const atkH = data.attacks && data.attacks.length > 0 ? data.attacks.length * rowH + 4 : 0
+  const measureCanvas = createCanvas(CARD_W, 1)
+  const measureCtx = measureCanvas.getContext('2d')
   const genParts: string[] = []
   if (data.genocidable === false) genParts.push('不可灭绝')
   if (data.notGeneratedNormally) genParts.push('不随机生成')
@@ -94,9 +93,7 @@ export async function renderMonsterCard(data: MonsterCardData): Promise<Buffer> 
   if (data.appearsInLargeGroups) genParts.push('成大群出现')
   if (data.leavesCorpse === false) genParts.push('不留尸体')
   const hasGenSection = !!data.generates || genParts.length > 0
-  const genSectionH = hasGenSection ? (10 + (data.generates ? rowH : 0) + (genParts.length > 0 ? 22 : 0) + 8) : 0
-  const footerH = 28
-  const CARD_H = headerH + tileAreaH + 12 + rowsTotalH + genSectionH + flagsH + atkH + footerH + PAD * 3
+  const CARD_H = calculateCardHeight(data, rows.length, hasGenSection, headerH, tileAreaH, rowH, measureCtx)
 
   const canvas = createCanvas(CARD_W, CARD_H)
   const ctx = canvas.getContext('2d')
@@ -243,6 +240,58 @@ export async function renderMonsterCard(data: MonsterCardData): Promise<Buffer> 
   return canvas.toBuffer('image/png')
 }
 
+function calculateCardHeight(
+  data: MonsterCardData,
+  rowCount: number,
+  hasGenSection: boolean,
+  headerH: number,
+  tileAreaH: number,
+  rowH: number,
+  measureCtx: any,
+): number {
+  let y = PAD
+
+  y += headerH
+  y += tileAreaH
+
+  if (data.variant) {
+    y += 26
+  }
+
+  y += 8
+  y += 10 // 属性区前分隔线
+  y += rowCount * rowH
+
+  if (hasGenSection) {
+    y += 10
+    if (data.generates) y += rowH
+    if ((data.genocidable === false)
+      || data.notGeneratedNormally
+      || data.appearsInSmallGroups
+      || data.appearsInLargeGroups
+      || (data.leavesCorpse === false)) {
+      y += 22
+    }
+    y += 8
+  }
+
+  if (data.attacks && data.attacks.length > 0) {
+    y += 4
+    y += 8 // 攻击区分隔线后间距
+    y += rowH // “攻击方式”标题行
+    y += data.attacks.length * rowH
+  }
+
+  if (data.flags && data.flags.length > 0) {
+    y += 4
+    y += 8 // 特性区分隔线后间距
+    y += estimateFlagTagsDrawnHeight(measureCtx, CARD_W - PAD * 2, data.flags)
+    y += 6
+  }
+
+  return y + PAD
+}
+
 // ── 辅助：构建属性行 ────────────────────────────────────────────────────────
 function buildRows(data: MonsterCardData): Array<{ label: string; value: string; highlight?: boolean }> {
   const rows: Array<{ label: string; value: string; highlight?: boolean }> = []
@@ -280,10 +329,24 @@ function sizeLabel(size: string): string {
   }
 }
 
-function estimateFlagsH(flags: string[], maxW: number): number {
-  const tagW = 80
-  const cols = Math.max(1, Math.floor(maxW / (tagW + 6)))
-  return Math.ceil(flags.length / cols) * 26 + 36
+function estimateFlagTagsDrawnHeight(ctx: any, maxW: number, flags: string[]): number {
+  // 与 drawFlagTags 的排版逻辑一致，避免高度预估与实际绘制不一致导致底部留白。
+  const hGap = 6
+  const vGap = 4
+  const tagH = 20
+  let y = 20 // “特性”标题占位
+  let cx = 0
+
+  for (const flag of flags) {
+    const tw = measureText(ctx, flag, `11px "Microsoft YaHei"`) + 16
+    if (cx + tw > maxW && cx !== 0) {
+      cx = 0
+      y += tagH + vGap
+    }
+    cx += tw + hGap
+  }
+
+  return y + tagH + vGap
 }
 
 // ── 绘制基础工具 ─────────────────────────────────────────────────────────────
