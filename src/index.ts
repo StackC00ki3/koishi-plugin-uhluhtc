@@ -17,18 +17,24 @@ export interface Config {
 export const Config: Schema<Config> = Schema.object({
   useBuiltinData: Schema.boolean().description('使用内置数据（内置的 monsterDB 与 tilesets）').default(true),
   dataPath: Schema.string().description('自定义数据路径（关闭自带数据时生效）').default('./data/uhluhtc'),
-  enabledGroupIds: Schema.array(String).role('table').description('仅在这些QQ群号生效（留空则全部群聊生效）').default([]),
+  enabledGroupIds: Schema.array(String).role('table').description('仅在这些群号或私聊QQ号生效（留空则全部会话生效）').default([]),
 })
 
 export async function apply(ctx: Context, config: Config) {
   const logger = ctx.logger('uhluhtc')
   const enabledGroupIds = new Set((config.enabledGroupIds || []).map(id => String(id).trim()).filter(Boolean))
 
-  const isSessionEnabled = (session: { guildId?: string }): boolean => {
+  const isSessionEnabled = (session: { guildId?: string, userId?: string }): boolean => {
     if (enabledGroupIds.size === 0) return true
     const guildId = session.guildId?.trim()
-    if (!guildId) return false
-    return enabledGroupIds.has(guildId)
+    if (guildId) {
+      return enabledGroupIds.has(guildId)
+    }
+
+    // 私聊场景无 guildId，兼容使用 QQ 号（userId）白名单
+    const userId = session.userId?.trim()
+    if (!userId) return false
+    return enabledGroupIds.has(userId)
   }
 
   // 在插件启动时初始化字体，避免首次渲染卡片时才加载。
@@ -121,7 +127,7 @@ export async function apply(ctx: Context, config: Config) {
   logger.info(`已加载 ${trueLines.length} 条幸运饼干真签文，${falseLines.length} 条假签文`)
   logger.info(`已加载 ${oracleLines.length} 条神谕文本`)
   logger.info(`已加载 ${tipLineCount} 条地牢小贴士，读取 ${tipKeywordToLines.size} 个中文关键字`)
-  logger.info(`群号白名单模式: ${enabledGroupIds.size > 0 ? `已启用（${enabledGroupIds.size} 个群）` : '未启用（全部群聊生效）'}`)
+  logger.info(`群号/私聊QQ号白名单模式: ${enabledGroupIds.size > 0 ? `已启用（${enabledGroupIds.size} 条）` : '未启用（全部会话生效）'}`)
 
   // 帮助命令
   ctx.command('卢克', '显示 uhluhtc 插件帮助信息')
