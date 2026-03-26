@@ -6,6 +6,7 @@ interface TranslationData {
   flags?: Record<string, string>
   attackTypes?: Record<string, string>
   damageTypes?: Record<string, string>
+  resistances?: Record<string, string>
 }
 
 export class Translation {
@@ -14,6 +15,7 @@ export class Translation {
   private flTranslation: Map<string, string> = new Map()
   private atTranslation: Map<string, string> = new Map()
   private adTranslation: Map<string, string> = new Map()
+  private reTranslation: Map<string, string> = new Map()
   private logger?: Logger
 
   constructor(logger?: Logger) {
@@ -39,6 +41,10 @@ export class Translation {
 
     if (data.damageTypes) {
       this.adTranslation = new Map(Object.entries(data.damageTypes))
+    }
+
+    if (data.resistances) {
+      this.reTranslation = new Map(Object.entries(data.resistances))
     }
 
     this.logger?.info(`怪物翻译数: ${this.monTranslation.size}`)
@@ -86,5 +92,9 @@ export class Translation {
 
   translateDamageType(type: string): string | undefined {
     return this.adTranslation.get(type)
+  }
+
+  translateResistance(type: string): string | undefined {
+    return this.reTranslation.get(type)
   }
 }

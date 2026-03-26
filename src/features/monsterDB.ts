@@ -216,6 +216,10 @@ export class MonsterDB {
     let result = ''
     const name = monster.name || ''
     const translatedName = translation.getChineseName(name)
+    const resistances = Array.isArray(monster.resistances) ? monster.resistances : []
+    const conferred = Array.isArray(monster.conferred) ? monster.conferred : []
+    const translatedResistances = resistances.map((r: string) => translation.translateResistance(r) || r)
+    const translatedConferred = conferred.map((r: string) => translation.translateResistance(r) || r)
 
     result += `怪物名: ${translatedName || name}\n`
 
@@ -242,6 +246,8 @@ export class MonsterDB {
     // 其他属性
     if (monster.weight) result += `重量: ${monster.weight}\n`
     if (monster.nutrition) result += `营养价值: ${monster.nutrition}\n`
+    result += `抗性: ${translatedResistances.length > 0 ? translatedResistances.join(' / ') : '无'}\n`
+    result += `食用获得抗性: ${translatedConferred.length > 0 ? translatedConferred.join(' / ') : '无'}\n`
     if (monster.size) result += `体型: ${monster.size}\n`
 
     // 标志
@@ -304,6 +310,8 @@ export class MonsterDB {
       alignment: monster.alignment,
       weight: monster.weight,
       nutrition: monster.nutrition,
+      resistances: translatedResistances,
+      conferred: translatedConferred,
       size: monster.size,
       generates: String(monster.generates)
         .replace('gehennom', '欣嫩谷')

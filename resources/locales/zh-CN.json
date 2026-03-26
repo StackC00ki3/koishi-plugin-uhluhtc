@@ -825,5 +825,17 @@
     "AdPerHitDie": "每命中骰",
     "AdSeverePoison": "剧毒",
     "AdHolyUnholyEnergy": "圣邪能量"
+  },
+  "resistances": {
+    "ReAcid": "酸性",
+    "ReCold": "冰爽",
+    "ReDisintegrate": "分解",
+    "ReDrain": "等级吸收",
+    "ReElectricity": "电击",
+    "ReFire": "火焰",
+    "ReMagic": "魔法",
+    "RePetrification": "石化",
+    "RePoison": "毒性",
+    "ReSleep": "沉睡"
   }
 }

@@ -17,6 +17,8 @@ export interface MonsterCardData {
   attacks?: Array<{ atkType: string; dmgType: string; numDice: number; sizeDice: number }>
   weight?: number
   nutrition?: number
+  resistances?: string[]
+  conferred?: string[]
   size?: string
   flags?: string[]
   generates?: string
@@ -50,6 +52,8 @@ const C = {
 
 const CARD_W = 360
 const PAD = 16
+const SECTION_DIVIDER_Y_OFFSET = 4
+const SECTION_CONTENT_TOP_GAP = 10
 let fontsRegistered = false
 
 /** 在插件启动时调用一次，避免首次渲染时才注册字体 */
@@ -92,8 +96,9 @@ export async function renderMonsterCard(data: MonsterCardData): Promise<Buffer> 
   if (data.appearsInSmallGroups) genParts.push('成群出现')
   if (data.appearsInLargeGroups) genParts.push('成大群出现')
   if (data.leavesCorpse === false) genParts.push('不留尸体')
+  const hasResistanceSection = data.resistances !== undefined || data.conferred !== undefined
   const hasGenSection = !!data.generates || genParts.length > 0
-  const CARD_H = calculateCardHeight(data, rows.length, hasGenSection, headerH, tileAreaH, rowH, measureCtx)
+  const CARD_H = calculateCardHeight(data, rows.length, hasResistanceSection, hasGenSection, headerH, tileAreaH, rowH, measureCtx)
 
   const canvas = createCanvas(CARD_W, CARD_H)
   const ctx = canvas.getContext('2d')
@@ -179,7 +184,7 @@ export async function renderMonsterCard(data: MonsterCardData): Promise<Buffer> 
 
   // ── 分隔线 ────────────────────────────────────────────────────────────────
   drawDivider(ctx, PAD, y, CARD_W - PAD * 2, C.divider)
-  y += 10
+  y += SECTION_CONTENT_TOP_GAP
 
   // ── 属性行 ────────────────────────────────────────────────────────────────
   ctx.textAlign = 'left'
@@ -188,10 +193,20 @@ export async function renderMonsterCard(data: MonsterCardData): Promise<Buffer> 
     y += rowH
   }
 
+  // ── 抗性信息 ──────────────────────────────────────────────────────────────
+  if (hasResistanceSection) {
+    drawDivider(ctx, PAD, y + SECTION_DIVIDER_Y_OFFSET, CARD_W - PAD * 2, C.divider)
+    y += SECTION_CONTENT_TOP_GAP
+    drawStatRow(ctx, PAD, y, CARD_W - PAD * 2, '抗性', formatList(data.resistances))
+    y += rowH
+    drawStatRow(ctx, PAD, y, CARD_W - PAD * 2, '食用获得抗性', formatList(data.conferred))
+    y += rowH
+  }
+
   // ── 生成信息 ──────────────────────────────────────────────────────────────
   if (hasGenSection) {
-    drawDivider(ctx, PAD, y, CARD_W - PAD * 2, C.divider)
-    y += 10
+    drawDivider(ctx, PAD, y + SECTION_DIVIDER_Y_OFFSET, CARD_W - PAD * 2, C.divider)
+    y += SECTION_CONTENT_TOP_GAP
     if (data.generates) {
       drawStatRow(ctx, PAD, y, CARD_W - PAD * 2, '生成于', data.generates)
       y += rowH
@@ -201,9 +216,8 @@ export async function renderMonsterCard(data: MonsterCardData): Promise<Buffer> 
       ctx.fillStyle = C.subtitle
       ctx.textAlign = 'center'
       ctx.fillText(genParts.join('  ·  '), CARD_W / 2, y + 14)
-      y += 22
+      y += rowH
     }
-    y += 8
   }
 
   // ── 攻击 ──────────────────────────────────────────────────────────────────
@@ -243,6 +257,7 @@ export async function renderMonsterCard(data: MonsterCardData): Promise<Buffer> 
 function calculateCardHeight(
   data: MonsterCardData,
   rowCount: number,
+  hasResistanceSection: boolean,
   hasGenSection: boolean,
   headerH: number,
   tileAreaH: number,
@@ -259,11 +274,16 @@ function calculateCardHeight(
   }
 
   y += 8
-  y += 10 // 属性区前分隔线
+  y += SECTION_CONTENT_TOP_GAP // 属性区前分隔线
   y += rowCount * rowH
 
+  if (hasResistanceSection) {
+    y += SECTION_CONTENT_TOP_GAP
+    y += rowH * 2
+  }
+
   if (hasGenSection) {
-    y += 10
+    y += SECTION_CONTENT_TOP_GAP
     if (data.generates) y += rowH
     if ((data.genocidable === false)
       || data.notGeneratedNormally
@@ -289,7 +309,7 @@ function calculateCardHeight(
     y += 6
   }
 
-  return y + PAD
+  return y
 }
 
 // ── 辅助：构建属性行 ────────────────────────────────────────────────────────
@@ -307,6 +327,11 @@ function buildRows(data: MonsterCardData): Array<{ label: string; value: string;
   if (data.nutrition !== undefined) rows.push({ label: '营养价值', value: String(data.nutrition) })
 
   return rows
+}
+
+function formatList(items?: string[]): string {
+  if (!items || items.length === 0) return '无'
+  return items.join(' , ')
 }
 
 function alignmentLabel(alignment: number | string): string {
