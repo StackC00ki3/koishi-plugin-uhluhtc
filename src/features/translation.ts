@@ -1,5 +1,6 @@
 import { Logger } from 'koishi'
-import builtinData from '../../resources/locales/zh-CN.json'
+import * as fs from 'fs'
+import * as path from 'path'
 
 interface TranslationData {
   monsters?: Record<string, string>
@@ -18,9 +19,19 @@ export class Translation {
   private reTranslation: Map<string, string> = new Map()
   private logger?: Logger
 
-  constructor(logger?: Logger) {
+  constructor(dataPath: string, logger?: Logger) {
     this.logger = logger
-    this.loadTranslations(builtinData)
+    const localePath = path.join(dataPath, 'locales', 'zh-CN.json')
+    if (!fs.existsSync(localePath)) {
+      this.logger?.warn(`未找到翻译文件: ${localePath}`)
+      return
+    }
+
+    try {
+      this.loadTranslations(JSON.parse(fs.readFileSync(localePath, 'utf-8')))
+    } catch (error) {
+      this.logger?.warn(`加载翻译文件失败: ${error instanceof Error ? error.message : String(error)}`)
+    }
   }
 
   private loadTranslations(data: TranslationData): void {

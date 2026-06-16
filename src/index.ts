@@ -22,12 +22,12 @@ export interface Config {
 }
 
 export const Config: Schema<Config> = Schema.object({
-  useBuiltinData: Schema.boolean().description('使用内置数据（内置的 monsterDB 与 tilesets）').default(true),
-  dataPath: Schema.string().description('自定义数据路径（关闭自带数据时生效）').default('./data/uhluhtc'),
+  useBuiltinData: Schema.boolean().description('已废弃：除字体外的数据不再内置，始终从 dataPath 读取。').default(false),
+  dataPath: Schema.string().description('数据目录，默认使用 Koishi 工作目录下的 data/uhluhtc。').default('data/uhluhtc'),
   enabledGroupIds: Schema.array(String).role('table').description('仅在这些群号或私聊QQ号生效（留空则全部会话生效）').default([]),
   tipSendProbability: Schema.percent().description('nh小贴士发送概率，命中关键词后按此概率启动 10 分钟倒计时。').default(0.25),
   lejiuEnabled: Schema.boolean().description('是否启用乐九模块；管理员可通过 @乐九 开机 / @乐九 关机 修改同一开关。').default(true),
-  lejiuDataPath: Schema.string().description('乐九数据目录（留空使用插件内置 resources/lejiu，文件格式保持原样）').default(''),
+  lejiuDataPath: Schema.string().description('乐九数据目录（留空使用 dataPath 下的 lejiu，文件格式保持原样）').default(''),
   lejiuAdminUserId: Schema.string().description('乐九管理员 QQ；该用户可通过 @乐九 开机 / @乐九 关机 修改乐九模块开关。').default('2903144214'),
   lejiuCancelUserId: Schema.string().description('乐九回复取消用户 QQ；该用户在等待期间发言会取消待发送回复。').default('2903144214'),
   lejiuReplyDelay: Schema.number().role('time').description('乐九功能回复前等待时间。').default(3 * 1000),
@@ -36,12 +36,30 @@ export const Config: Schema<Config> = Schema.object({
 export async function apply(ctx: Context, config: Config) {
   const logger = ctx.logger('uhluhtc')
   const enabledGroupIds = new Set((config.enabledGroupIds || []).map(id => String(id).trim()).filter(Boolean))
+  const resolveConfiguredPath = (configuredPath: string | undefined, fallback: string): string => {
+    const rawPath = configuredPath?.trim() || fallback
+    return path.isAbsolute(rawPath) ? rawPath : path.join(ctx.baseDir, rawPath)
+  }
+
+  const readTextLines = (filePath: string, label: string): string[] => {
+    if (!fs.existsSync(filePath)) {
+      logger.warn(`未找到${label}: ${filePath}`)
+      return []
+    }
+    return fs.readFileSync(filePath, 'utf-8')
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(Boolean)
+  }
+
+  const dataRoot = resolveConfiguredPath(config.dataPath, path.join('data', 'uhluhtc'))
   const rawTipSendProbability = config.tipSendProbability ?? 0.25
   const tipSendProbability = Number.isFinite(rawTipSendProbability)
     ? Math.max(0, Math.min(1, rawTipSendProbability))
     : 0.25
   const lejiuDataDir = config.lejiuDataPath?.trim()
-    || path.join(__dirname, '..', 'resources', 'lejiu')
+    ? resolveConfiguredPath(config.lejiuDataPath, path.join('data', 'uhluhtc', 'lejiu'))
+    : path.join(dataRoot, 'lejiu')
   const legacyLejiuUserId = (config as Config & { lejiuOwnerUserId?: string }).lejiuOwnerUserId?.trim()
   const lejiuAdminUserId = (config.lejiuAdminUserId || legacyLejiuUserId || '2903144214').trim()
   const lejiuCancelUserId = (config.lejiuCancelUserId || legacyLejiuUserId || '2903144214').trim()
@@ -63,6 +81,18 @@ export async function apply(ctx: Context, config: Config) {
     return enabledGroupIds.has(userId)
   }
 
+  if (!fs.existsSync(dataRoot)) {
+    fs.mkdirSync(dataRoot, { recursive: true })
+    logger.warn(`数据目录不存在，已创建: ${dataRoot}`)
+    logger.warn('运行数据不再内置，请将 fonts、monsterDB、tilesets、fortune_cookies、oracle、nethack_tips、locales、lejiu 等目录放入该目录')
+  }
+  const loadedFontCount = initializeCardRendererFonts(path.join(dataRoot, 'fonts'))
+  logger.info(`卡片渲染字体初始化完成，已加载 ${loadedFontCount} 个字体`)
+
+  const monsterDBDataPath = path.join(dataRoot, 'monsterDB')
+  const tilesDataPath = dataRoot
+  logger.info(`使用数据目录: ${dataRoot}`)
+
   setupLejiuFeatures(ctx, {
     enabled: config.lejiuEnabled !== false,
     dataDir: lejiuDataDir,
@@ -72,55 +102,20 @@ export async function apply(ctx: Context, config: Config) {
     isSessionEnabled,
   })
 
-  // 在插件启动时初始化字体，避免首次渲染卡片时才加载。
-  const loadedFontCount = initializeCardRendererFonts(path.join(__dirname, '..', 'resources', 'fonts'))
-  logger.info(`卡片渲染字体初始化完成，已加载 ${loadedFontCount} 个字体`)
-
-  let monsterDBDataPath: string
-  let tilesDataPath: string
-
-  if (config.useBuiltinData !== false) {
-    // 使用 package 自带数据
-    monsterDBDataPath = path.join(__dirname, '..', 'resources', 'monsterDB')
-    tilesDataPath = path.join(__dirname, '..', 'resources')
-    logger.info('使用自带数据')
-  } else {
-    const dataPath = config.dataPath || path.join(ctx.baseDir, 'data', 'uhluhtc')
-    if (!fs.existsSync(dataPath)) {
-      fs.mkdirSync(dataPath, { recursive: true })
-      logger.warn(`数据目录不存在，已创建: ${dataPath}`)
-      logger.warn('请从 https://github.com/UnNetHack/pinobot/tree/master/variants 下载怪物数据文件到该目录')
-    }
-    monsterDBDataPath = dataPath
-    tilesDataPath = dataPath
-    logger.info(`使用自定义数据: ${dataPath}`)
-  }
-
   const tiles = new Tiles(tilesDataPath, logger)
   await tiles.init()
 
   const monsterDB = new MonsterDB(monsterDBDataPath, logger, tiles)
-  const translation = new Translation(logger)
+  const translation = new Translation(dataRoot, logger)
 
-  const fortuneCookiesPath = path.join(__dirname, '..', 'resources', 'fortune_cookies')
-  const falseLines = fs.readFileSync(path.join(fortuneCookiesPath, 'fal.txt'), 'utf-8')
-    .split(/\r?\n/)
-    .map(line => line.trim())
-    .filter(Boolean)
-  const trueLines = fs.readFileSync(path.join(fortuneCookiesPath, 'tru.txt'), 'utf-8')
-    .split(/\r?\n/)
-    .map(line => line.trim())
-    .filter(Boolean)
+  const fortuneCookiesPath = path.join(dataRoot, 'fortune_cookies')
+  const falseLines = readTextLines(path.join(fortuneCookiesPath, 'fal.txt'), '幸运饼干假签文')
+  const trueLines = readTextLines(path.join(fortuneCookiesPath, 'tru.txt'), '幸运饼干真签文')
 
-  const oraclePath = path.join(__dirname, '..', 'resources', 'oracle', 'ora.txt')
-  const oracleLines = fs.existsSync(oraclePath)
-    ? fs.readFileSync(oraclePath, 'utf-8')
-      .split(/\r?\n/)
-      .map(line => line.trim())
-      .filter(Boolean)
-    : []
+  const oraclePath = path.join(dataRoot, 'oracle', 'ora.txt')
+  const oracleLines = readTextLines(oraclePath, '神谕文本')
 
-  const tipKeywordsPath = path.join(__dirname, '..', 'resources', 'nethack_tips', 'keywords.txt')
+  const tipKeywordsPath = path.join(dataRoot, 'nethack_tips', 'keywords.txt')
   const tipKeywordToLines = new Map<string, string[]>()
   if (fs.existsSync(tipKeywordsPath)) {
     const keywordRows = fs.readFileSync(tipKeywordsPath, 'utf-8')

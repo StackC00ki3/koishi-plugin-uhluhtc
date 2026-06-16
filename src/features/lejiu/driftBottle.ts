@@ -3,7 +3,7 @@ import axios from 'axios'
 import * as fs from 'fs'
 import * as path from 'path'
 import { PropertiesFile } from './propertiesFile'
-import { renderLejiuMessage } from './render'
+import { renderLejiuMessage, resolveLejiuPath } from './render'
 
 interface SessionLike {
   content?: string
@@ -131,15 +131,15 @@ export class LejiuDriftBottle {
     const held = this.getHeldBottle(session)
     if (held <= 0) return '你手里没有漂流瓶'
 
-    const imageCount = this.getCount('图片')
+    const imageBottleIndices = this.getAvailableImageBottleIndices()
     const textCount = this.getCount('文字')
-    const total = imageCount + textCount
+    const total = imageBottleIndices.length + textCount
     if (total <= 0) return '湖里暂时没有漂流瓶'
 
     const picked = Math.floor(Math.random() * total) + 1
-    const isImageBottle = picked <= imageCount
+    const isImageBottle = picked <= imageBottleIndices.length
     const pickedIndex = isImageBottle
-      ? Math.floor(Math.random() * imageCount) + 1
+      ? imageBottleIndices[Math.floor(Math.random() * imageBottleIndices.length)]
       : Math.floor(Math.random() * textCount) + 1
     const storeName = isImageBottle ? '图片漂流瓶' : '文字漂流瓶'
     const bottle = this.store(storeName).get(String(pickedIndex), '诶嘿')
@@ -147,6 +147,18 @@ export class LejiuDriftBottle {
     this.setHeldBottle(session, held - 1)
     this.store('上次查看').set(this.getUserId(session), pickedIndex)
     return renderLejiuMessage(`你把瓶子上的瓶塞取掉，从里面拿出纸条，你看到纸条上写着：\n${bottle}`, this.dataDir)
+  }
+
+  private getAvailableImageBottleIndices(): number[] {
+    return this.store('图片漂流瓶')
+      .entries()
+      .filter(([key, value]) => /^\d+$/.test(key) && this.hasLocalImage(value))
+      .map(([key]) => Number(key))
+  }
+
+  private hasLocalImage(value: string): boolean {
+    const imagePath = /±img=([^±]+)±/.exec(value)?.[1]
+    return !!imagePath && fs.existsSync(resolveLejiuPath(this.dataDir, imagePath))
   }
 
   private throwTextBottle(session: SessionLike, text: string): string {

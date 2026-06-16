@@ -139,7 +139,8 @@ NetHack information query plugin for Koishi
 
 行为：
 
-- 乐九数据保持原文件格式，默认读取 resources/lejiu 下的原始文件。
+- 乐九数据保持原文件格式，默认读取 data/uhluhtc/lejiu。
+- 为控制 npm 包体积，发布包不内置运行数据；请将完整数据目录放到 data/uhluhtc，或用 dataPath / lejiuDataPath 指向外部数据目录。
 - lejiuEnabled 是乐九模块初始开关，管理员可通过 @乐九 开机 / @乐九 关机 修改同一个运行时开关。
 - 命中乐九功能后不会立刻回复，会先等待 lejiuReplyDelay。
 - 若等待期间 lejiuCancelUserId 对应用户在同一会话发言，则取消本次回复和相关写入。
@@ -176,21 +177,21 @@ NetHack information query plugin for Koishi
 
 插件提供以下配置项：
 
-- useBuiltinData: 是否使用内置数据库，默认 true
-- dataPath: 自定义数据库目录，默认 ./data/uhluhtc（仅在 useBuiltinData 为 false 时生效）
+- useBuiltinData: 已废弃，运行数据不再内置
+- dataPath: 数据目录，默认 data/uhluhtc
 - enabledGroupIds: 生效QQ群号白名单（字符串数组），留空表示全部群聊生效
 - tipSendProbability: nh小贴士发送概率，默认 25%
 - lejiuEnabled: 乐九模块初始开关，默认 true
-- lejiuDataPath: 乐九数据目录，留空使用插件内置 resources/lejiu
+- lejiuDataPath: 乐九数据目录，留空使用 dataPath 下的 lejiu
 - lejiuAdminUserId: 乐九管理员 QQ，可使用 @乐九 开机 / @乐九 关机，默认 2903144214
 - lejiuCancelUserId: 乐九回复取消用户 QQ，该用户发言会取消待发送回复，默认 2903144214
 - lejiuReplyDelay: 乐九功能回复前等待时间，默认 3 分钟
 
 说明：
 
-- 开启 useBuiltinData 时，直接使用插件内置的 monsterDB 与 tiles 资源。
-- 关闭 useBuiltinData 时，插件会尝试使用 dataPath 目录，并在目录不存在时自动创建。
-- 若使用自定义数据，请将怪物 YAML 数据, tilesets, fonts 等放入 dataPath。怪物数据来源可参考：
+- 插件会尝试使用 dataPath 目录，并在目录不存在时自动创建。
+- dataPath 默认目录结构应包含 fonts、monsterDB、tilesets、fortune_cookies、oracle、nethack_tips、locales、lejiu 等目录。
+- 若使用自定义数据，请将字体放入 dataPath/fonts，怪物 YAML 数据放入 dataPath/monsterDB，tilesets 放入 dataPath/tilesets。怪物数据来源可参考：
 	https://github.com/UnNetHack/pinobot/tree/master/variants
 
 ## 致谢
