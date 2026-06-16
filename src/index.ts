@@ -12,17 +12,23 @@ export interface Config {
   useBuiltinData?: boolean
   dataPath?: string
   enabledGroupIds?: string[]
+  tipSendProbability?: number
 }
 
 export const Config: Schema<Config> = Schema.object({
   useBuiltinData: Schema.boolean().description('使用内置数据（内置的 monsterDB 与 tilesets）').default(true),
   dataPath: Schema.string().description('自定义数据路径（关闭自带数据时生效）').default('./data/uhluhtc'),
   enabledGroupIds: Schema.array(String).role('table').description('仅在这些群号或私聊QQ号生效（留空则全部会话生效）').default([]),
+  tipSendProbability: Schema.percent().description('nh小贴士发送概率，命中关键词后按此概率启动 10 分钟倒计时。').default(0.25),
 })
 
 export async function apply(ctx: Context, config: Config) {
   const logger = ctx.logger('uhluhtc')
   const enabledGroupIds = new Set((config.enabledGroupIds || []).map(id => String(id).trim()).filter(Boolean))
+  const rawTipSendProbability = config.tipSendProbability ?? 0.25
+  const tipSendProbability = Number.isFinite(rawTipSendProbability)
+    ? Math.max(0, Math.min(1, rawTipSendProbability))
+    : 0.25
 
   const isSessionEnabled = (session: { guildId?: string, userId?: string, platform?: string }): boolean => {
     if (session.platform?.includes('sandbox')) return true
@@ -128,6 +134,7 @@ export async function apply(ctx: Context, config: Config) {
   logger.info(`已加载 ${trueLines.length} 条幸运饼干真签文，${falseLines.length} 条假签文`)
   logger.info(`已加载 ${oracleLines.length} 条神谕文本`)
   logger.info(`已加载 ${tipLineCount} 条地牢小贴士，读取 ${tipKeywordToLines.size} 个中文关键字`)
+  logger.info(`nh小贴士发送概率: ${(tipSendProbability * 100).toFixed(0)}%`)
   logger.info(`群号/私聊QQ号白名单模式: ${enabledGroupIds.size > 0 ? `已启用（${enabledGroupIds.size} 条）` : '未启用（全部会话生效）'}`)
 
   // 帮助命令
@@ -142,7 +149,7 @@ export async function apply(ctx: Context, config: Config) {
         '4.生成 nethack 怪物赛跑 GIF：怪物赛跑 [怪物1,怪物2,...]（默认原版，可写 分支?怪物名）\n' +
         '5.幸运饼干（别名：幸运曲奇/吃饼干/吃曲奇）: 抽取幸运饼干签文\n' +
         '6.神谕: 抽取神谕文本\n' +
-        '7.nh小贴士: 聊天触发关键字后，若 10 分钟无人发言自动推送'
+        `7.nh小贴士: 聊天触发关键字后，按 ${(tipSendProbability * 100).toFixed(0)}% 概率启动倒计时，若 10 分钟无人发言自动推送`
     })
 
   // 幸运饼干
@@ -261,17 +268,21 @@ export async function apply(ctx: Context, config: Config) {
     if (tipKeywordToLines.size > 0) {
       const matchedTipLines = resolveMatchedTipLines(content)
       if (matchedTipLines.length > 0) {
-        logger.info(`[nh小贴士] 命中关键字，会话=${channelId}，候选条数=${matchedTipLines.length}`)
-        const timer = setTimeout(async () => {
-          tipCountdownByChannel.delete(channelId)
-          const pickedLine = matchedTipLines[Math.floor(Math.random() * matchedTipLines.length)]
-          try {
-            await session.send(pickedLine)
-          } catch (error) {
-            logger.warn(`发送nh小贴士失败: ${error instanceof Error ? error.message : String(error)}`)
-          }
-        }, 10 * 60 * 1000)
-        tipCountdownByChannel.set(channelId, timer)
+        if (Math.random() >= tipSendProbability) {
+          logger.info(`[nh小贴士] 命中关键字但未通过概率判定，会话=${channelId}，候选条数=${matchedTipLines.length}，概率=${(tipSendProbability * 100).toFixed(0)}%`)
+        } else {
+          logger.info(`[nh小贴士] 命中关键字并通过概率判定，会话=${channelId}，候选条数=${matchedTipLines.length}，概率=${(tipSendProbability * 100).toFixed(0)}%`)
+          const timer = setTimeout(async () => {
+            tipCountdownByChannel.delete(channelId)
+            const pickedLine = matchedTipLines[Math.floor(Math.random() * matchedTipLines.length)]
+            try {
+              await session.send(pickedLine)
+            } catch (error) {
+              logger.warn(`发送nh小贴士失败: ${error instanceof Error ? error.message : String(error)}`)
+            }
+          }, 10 * 60 * 1000)
+          tipCountdownByChannel.set(channelId, timer)
+        }
       }
     }
 

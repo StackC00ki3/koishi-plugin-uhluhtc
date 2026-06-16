@@ -121,6 +121,7 @@ NetHack information query plugin for Koishi
 行为：
 
 - 当聊天消息命中内置 tips 关键词后，开始倒计时 10 分钟
+- 默认按 25% 概率触发，可通过 tipSendProbability 配置
 - 若 10 分钟内该会话无人发言，自动推送一条命中关键词的小贴士
 - 若命中多条，则随机抽取一条发送
 
@@ -159,6 +160,7 @@ NetHack information query plugin for Koishi
 - useBuiltinData: 是否使用内置数据库，默认 true
 - dataPath: 自定义数据库目录，默认 ./data/uhluhtc（仅在 useBuiltinData 为 false 时生效）
 - enabledGroupIds: 生效QQ群号白名单（字符串数组），留空表示全部群聊生效
+- tipSendProbability: nh小贴士发送概率，默认 25%
 
 说明：
 
