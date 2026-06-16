@@ -14,7 +14,9 @@ NetHack information query plugin for Koishi
 - [x] 神谕 (龙龙) 
 - [x] 幸运🍪 (乐九,龙龙)
 - [x] nh小贴士 (龙龙)
-- [ ] 漂流瓶 (乐九,龙龙)
+- [x] 漂流瓶 (乐九,龙龙)
+- [x] 塔罗牌 (乐九)
+- [x] 固定回复 (乐九)
 
 ## 安装
 
@@ -125,6 +127,23 @@ NetHack information query plugin for Koishi
 - 若 10 分钟内该会话无人发言，自动推送一条命中关键词的小贴士
 - 若命中多条，则随机抽取一条发送
 
+### 10. 乐九功能
+
+- 塔罗牌
+- 查看漂流瓶
+- 漂流瓶 <内容>
+- 图片漂流瓶 <内容>，需要附带图片
+- 换漂流瓶
+- 换空瓶
+- 我的信息
+
+行为：
+
+- 乐九数据保持原文件格式，默认读取 resources/lejiu 下的原始文件。
+- lejiuEnabled 是乐九模块初始开关，管理员可通过 @乐九 开机 / @乐九 关机 修改同一个运行时开关。
+- 命中乐九功能后不会立刻回复，会先等待 lejiuReplyDelay。
+- 若等待期间 lejiuCancelUserId 对应用户在同一会话发言，则取消本次回复和相关写入。
+
 
 ## 分支简称
 
@@ -161,6 +180,11 @@ NetHack information query plugin for Koishi
 - dataPath: 自定义数据库目录，默认 ./data/uhluhtc（仅在 useBuiltinData 为 false 时生效）
 - enabledGroupIds: 生效QQ群号白名单（字符串数组），留空表示全部群聊生效
 - tipSendProbability: nh小贴士发送概率，默认 25%
+- lejiuEnabled: 乐九模块初始开关，默认 true
+- lejiuDataPath: 乐九数据目录，留空使用插件内置 resources/lejiu
+- lejiuAdminUserId: 乐九管理员 QQ，可使用 @乐九 开机 / @乐九 关机，默认 2903144214
+- lejiuCancelUserId: 乐九回复取消用户 QQ，该用户发言会取消待发送回复，默认 2903144214
+- lejiuReplyDelay: 乐九功能回复前等待时间，默认 3 分钟
 
 说明：
 

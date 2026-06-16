@@ -3,6 +3,7 @@ import { MonsterDB } from './features/monsterDB'
 import { Translation } from './features/translation'
 import { Tiles } from './features/tiles'
 import { initializeCardRendererFonts } from './features/cardRenderer'
+import { setupLejiuFeatures } from './features/lejiu'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -13,6 +14,11 @@ export interface Config {
   dataPath?: string
   enabledGroupIds?: string[]
   tipSendProbability?: number
+  lejiuEnabled?: boolean
+  lejiuDataPath?: string
+  lejiuAdminUserId?: string
+  lejiuCancelUserId?: string
+  lejiuReplyDelay?: number
 }
 
 export const Config: Schema<Config> = Schema.object({
@@ -20,6 +26,11 @@ export const Config: Schema<Config> = Schema.object({
   dataPath: Schema.string().description('自定义数据路径（关闭自带数据时生效）').default('./data/uhluhtc'),
   enabledGroupIds: Schema.array(String).role('table').description('仅在这些群号或私聊QQ号生效（留空则全部会话生效）').default([]),
   tipSendProbability: Schema.percent().description('nh小贴士发送概率，命中关键词后按此概率启动 10 分钟倒计时。').default(0.25),
+  lejiuEnabled: Schema.boolean().description('是否启用乐九模块；管理员可通过 @乐九 开机 / @乐九 关机 修改同一开关。').default(true),
+  lejiuDataPath: Schema.string().description('乐九数据目录（留空使用插件内置 resources/lejiu，文件格式保持原样）').default(''),
+  lejiuAdminUserId: Schema.string().description('乐九管理员 QQ；该用户可通过 @乐九 开机 / @乐九 关机 修改乐九模块开关。').default('2903144214'),
+  lejiuCancelUserId: Schema.string().description('乐九回复取消用户 QQ；该用户在等待期间发言会取消待发送回复。').default('2903144214'),
+  lejiuReplyDelay: Schema.number().role('time').description('乐九功能回复前等待时间。').default(3 * 1000),
 })
 
 export async function apply(ctx: Context, config: Config) {
@@ -29,6 +40,14 @@ export async function apply(ctx: Context, config: Config) {
   const tipSendProbability = Number.isFinite(rawTipSendProbability)
     ? Math.max(0, Math.min(1, rawTipSendProbability))
     : 0.25
+  const lejiuDataDir = config.lejiuDataPath?.trim()
+    || path.join(__dirname, '..', 'resources', 'lejiu')
+  const legacyLejiuUserId = (config as Config & { lejiuOwnerUserId?: string }).lejiuOwnerUserId?.trim()
+  const lejiuAdminUserId = (config.lejiuAdminUserId || legacyLejiuUserId || '2903144214').trim()
+  const lejiuCancelUserId = (config.lejiuCancelUserId || legacyLejiuUserId || '2903144214').trim()
+  const lejiuReplyDelay = Number.isFinite(config.lejiuReplyDelay)
+    ? Math.max(0, config.lejiuReplyDelay!)
+    : 3 * 60 * 1000
 
   const isSessionEnabled = (session: { guildId?: string, userId?: string, platform?: string }): boolean => {
     if (session.platform?.includes('sandbox')) return true
@@ -43,6 +62,15 @@ export async function apply(ctx: Context, config: Config) {
     if (!userId) return false
     return enabledGroupIds.has(userId)
   }
+
+  setupLejiuFeatures(ctx, {
+    enabled: config.lejiuEnabled !== false,
+    dataDir: lejiuDataDir,
+    adminUserId: lejiuAdminUserId,
+    cancelUserId: lejiuCancelUserId,
+    replyDelay: lejiuReplyDelay,
+    isSessionEnabled,
+  })
 
   // 在插件启动时初始化字体，避免首次渲染卡片时才加载。
   const loadedFontCount = initializeCardRendererFonts(path.join(__dirname, '..', 'resources', 'fonts'))
@@ -149,7 +177,8 @@ export async function apply(ctx: Context, config: Config) {
         '4.生成 nethack 怪物赛跑 GIF：怪物赛跑 [怪物1,怪物2,...]（默认原版，可写 分支?怪物名）\n' +
         '5.幸运饼干（别名：幸运曲奇/吃饼干/吃曲奇）: 抽取幸运饼干签文\n' +
         '6.神谕: 抽取神谕文本\n' +
-        `7.nh小贴士: 聊天触发关键字后，按 ${(tipSendProbability * 100).toFixed(0)}% 概率启动倒计时，若 10 分钟无人发言自动推送`
+        `7.nh小贴士: 聊天触发关键字后，按 ${(tipSendProbability * 100).toFixed(0)}% 概率启动倒计时，若 10 分钟无人发言自动推送\n` +
+        '8.乐九功能: 漂流瓶 / 图片漂流瓶 / 查看漂流瓶 / 换漂流瓶 / 换空瓶 / 塔罗牌 / 固定回复'
     })
 
   // 幸运饼干
