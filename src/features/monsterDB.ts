@@ -3,7 +3,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { Translation } from './translation'
 import { Tiles } from './tiles'
-import { renderMonsterCard, MonsterCardData } from './cardRenderer'
+import { MonsterCardRenderer, MonsterCardData } from './cardRenderer'
 import { renderMonsterRaceGif, RaceParticipant } from './raceRenderer'
 import { Logger } from 'koishi'
 
@@ -25,6 +25,7 @@ export class MonsterDB {
     private dataPath: string,
     private logger: Logger,
     private tiles?: Tiles,
+    private cardRenderer?: MonsterCardRenderer,
   ) {
     this.loadDatabase()
   }
@@ -290,11 +291,15 @@ export class MonsterDB {
       result += '不可灭绝\n'
     }
 
-    // 优先从 tileset 取贴图，无贴图时用符号图片
-    let tileImages: Buffer[] = this.tiles?.genImage(name) ?? []
-    if (tileImages.length === 0 && this.tiles && monster.symbol) {
-      tileImages = [this.tiles.genSymImage(monster.symbol, monster.color ?? 'white')]
+    // 没有 puppeteer 服务时退回文字版
+    if (!this.cardRenderer?.available) {
+      return { text: result.trimEnd() }
     }
+
+    // 无 tileset 贴图时卡片会直接显示彩色符号
+    const tileImages: Buffer[] = this.tiles?.genImage(name) ?? []
+    const generates: string[] = Array.isArray(monster.generates) ? monster.generates.map(String) : []
+    const withLabels = (codes: string[]) => codes.map(code => ({ code, label: translation.translateResistance(code) || code }))
     // 构建卡片数据
     const cardData: MonsterCardData = {
       name,
@@ -310,13 +315,13 @@ export class MonsterDB {
       alignment: monster.alignment,
       weight: monster.weight,
       nutrition: monster.nutrition,
-      resistances: translatedResistances,
-      conferred: translatedConferred,
+      resistances: withLabels(resistances),
+      conferred: withLabels(conferred),
       size: monster.size,
-      generates: String(monster.generates)
-        .replace('gehennom', '欣嫩谷')
-        .replace('dungeons', '命运地牢')
-        .replace('unique', '唯一'),
+      generates: generates
+        .filter(g => g !== 'unique')
+        .map(g => g.replace('gehennom', '欣嫩谷').replace('dungeons', '命运地牢')),
+      unique: generates.includes('unique'),
       notGeneratedNormally: monster['not-generated-normally'] === 'Yes',
       appearsInSmallGroups: monster['appears-in-small-groups'] === 'Yes',
       appearsInLargeGroups: monster['appears-in-large-groups'] === 'Yes',
@@ -330,6 +335,7 @@ export class MonsterDB {
       cardData.attacks = monster.attacks.map((atk: any[]) => ({
         atkType: translation.translateAttackType(atk[0]) || atk[0],
         dmgType: translation.translateDamageType(atk[1]) || atk[1],
+        dmgCode: atk[1],
         numDice: atk[2],
         sizeDice: atk[3],
       }))
@@ -340,8 +346,13 @@ export class MonsterDB {
       cardData.flags = monster.flags.map((f: string) => translation.translateFlag(f) || f)
     }
 
-    // 渲染图鉴卡片
-    const cardBuffer = await renderMonsterCard(cardData)
-    return { text: null, images: [cardBuffer] }
+    // 渲染图鉴卡片，失败时同样退回文字版
+    try {
+      const cardBuffer = await this.cardRenderer.render(cardData)
+      return { text: null, images: [cardBuffer] }
+    } catch (e) {
+      this.logger.warn('渲染怪物卡片失败，改为发送文字', e)
+      return { text: result.trimEnd() }
+    }
   }
 }

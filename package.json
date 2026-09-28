@@ -26,7 +26,13 @@
     "plugin"
   ],
   "peerDependencies": {
-    "koishi": "^4.18.7"
+    "koishi": "^4.18.7",
+    "koishi-plugin-puppeteer": "^3.9.0"
+  },
+  "peerDependenciesMeta": {
+    "koishi-plugin-puppeteer": {
+      "optional": true
+    }
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.96",
@@ -38,6 +44,14 @@
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.0.0",
     "koishi": "^4.0.0",
+    "koishi-plugin-puppeteer": "^3.9.0",
     "typescript": "^5.0.0"
+  },
+  "koishi": {
+    "service": {
+      "optional": [
+        "puppeteer"
+      ]
+    }
   }
 }

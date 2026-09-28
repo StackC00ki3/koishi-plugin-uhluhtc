@@ -2,12 +2,18 @@ import { Context, Schema, h } from 'koishi'
 import { MonsterDB } from './features/monsterDB'
 import { Translation } from './features/translation'
 import { Tiles } from './features/tiles'
-import { initializeCardRendererFonts } from './features/cardRenderer'
+import { MonsterCardRenderer } from './features/cardRenderer'
+import { registerCanvasFonts } from './features/fonts'
 import { setupLejiuFeatures } from './features/lejiu'
 import * as fs from 'fs'
 import * as path from 'path'
 
 export const name = 'uhluhtc'
+
+// 怪物卡片通过 puppeteer 把网页截图成图片，未安装时退回文字版
+export const inject = {
+  optional: ['puppeteer'],
+}
 
 export interface Config {
   useBuiltinData?: boolean
@@ -86,8 +92,9 @@ export async function apply(ctx: Context, config: Config) {
     logger.warn(`数据目录不存在，已创建: ${dataRoot}`)
     logger.warn('运行数据不再内置，请将 fonts、monsterDB、tilesets、fortune_cookies、oracle、nethack_tips、locales、lejiu 等目录放入该目录')
   }
-  const loadedFontCount = initializeCardRendererFonts(path.join(dataRoot, 'fonts'))
-  logger.info(`卡片渲染字体初始化完成，已加载 ${loadedFontCount} 个字体`)
+  const fontsDir = path.join(dataRoot, 'fonts')
+  const loadedFontCount = registerCanvasFonts(fontsDir)
+  logger.info(`canvas 字体初始化完成，已加载 ${loadedFontCount} 个字体`)
 
   const monsterDBDataPath = path.join(dataRoot, 'monsterDB')
   const tilesDataPath = dataRoot
@@ -105,7 +112,11 @@ export async function apply(ctx: Context, config: Config) {
   const tiles = new Tiles(tilesDataPath, logger)
   await tiles.init()
 
-  const monsterDB = new MonsterDB(monsterDBDataPath, logger, tiles)
+  const cardRenderer = new MonsterCardRenderer(ctx, fontsDir)
+  if (!cardRenderer.available) {
+    logger.warn('未检测到 puppeteer 服务，怪物卡片将以文字发送；启用 koishi-plugin-puppeteer 后可生成图片卡片')
+  }
+  const monsterDB = new MonsterDB(monsterDBDataPath, logger, tiles, cardRenderer)
   const translation = new Translation(dataRoot, logger)
 
   const fortuneCookiesPath = path.join(dataRoot, 'fortune_cookies')
