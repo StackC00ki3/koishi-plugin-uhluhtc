@@ -248,7 +248,7 @@ function renderAttacks(data: MonsterCardData): string {
   const rows = data.attacks.map(atk => {
     const el = DAMAGE_ELEMENTS[atk.dmgCode]
     const hasDice = atk.numDice > 0 && atk.sizeDice > 0
-    const range = hasDice && atk.sizeDice > 1 ? `${atk.numDice}–${atk.numDice * atk.sizeDice}` : ''
+    const range = !hasDice ? '' : atk.sizeDice > 1 ? `${atk.numDice}–${atk.numDice * atk.sizeDice}` : String(atk.numDice)
     return `
       <li class="attack${el ? ` el-${el}` : ''}">
         <span class="atk-type">${esc(atk.atkType)}</span>
