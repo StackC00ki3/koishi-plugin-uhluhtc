@@ -15,6 +15,7 @@ export interface MonsterCardData {
   name: string           // 英文名
   chineseName?: string   // 中文名
   variant?: string       // 分支名
+  prefix?: string        // 分支缩写（查询前缀），如 nn
   symbol?: string
   color?: string         // NetHack 颜色名，如 BrightBlue
   baseLevel?: number
@@ -163,7 +164,7 @@ ${Object.entries(ELEMENT_COLORS).map(([el, hex]) => `.el-${el} { --c: ${rgbChann
   <header class="hero">
     <div class="hero-text">
       <div class="eyebrow">
-        ${data.symbol?.trim() ? `<span class="glyph">${esc(data.symbol)}</span>` : ''}
+        ${data.prefix?.trim() ? `<span class="prefix">${esc(data.prefix)}</span>` : ''}
         <span>${esc(data.variant || 'NetHack')}</span>
       </div>
       <h1>${esc(title)}</h1>
@@ -180,16 +181,21 @@ ${Object.entries(ELEMENT_COLORS).map(([el, hex]) => `.el-${el} { --c: ${rgbChann
 
 function renderGallery(data: MonsterCardData): string {
   const imgs = (data.tileImages || []).slice(0, 4)
-  if (imgs.length === 0) {
-    return `<div class="gallery"><span class="big-glyph">${esc(data.symbol?.trim() || '?')}</span></div>`
-  }
+  const symbol = data.symbol?.trim()
+  const glyph = (text: string) => `<div class="gallery"><span class="big-glyph">${esc(text)}</span></div>`
+  if (imgs.length === 0) return glyph(symbol || '?')
+
+  let tiles: string
   if (imgs.length === 1) {
-    return `<div class="gallery"><img class="tile-lg" src="${dataUrl(imgs[0])}"></div>`
+    tiles = `<div class="gallery"><img class="tile-lg" src="${dataUrl(imgs[0])}"></div>`
+  } else {
+    const cells = [0, 1, 2, 3].map(i => imgs[i]
+      ? `<div class="cell"><img src="${dataUrl(imgs[i])}"></div>`
+      : '<div class="cell empty"></div>')
+    tiles = `<div class="gallery grid">${cells.join('')}</div>`
   }
-  const cells = [0, 1, 2, 3].map(i => imgs[i]
-    ? `<div class="cell"><img src="${dataUrl(imgs[i])}"></div>`
-    : '<div class="cell empty"></div>')
-  return `<div class="gallery grid">${cells.join('')}</div>`
+  // 有贴图时在左侧并排放一块同样大小的 ASCII 符号
+  return symbol ? `<div class="galleries">${glyph(symbol)}${tiles}</div>` : tiles
 }
 
 interface StatItem {
@@ -424,9 +430,10 @@ body { font-family: var(--sans); color: var(--text); text-rendering: optimizeLeg
   font-size: 12px; font-weight: 600; letter-spacing: .08em;
   color: var(--accent); text-transform: uppercase;
 }
-.glyph {
+/* 缩写区分大小写（v / V 是不同分支），不跟随 .eyebrow 转大写 */
+.prefix {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 22px; height: 22px;
+  min-width: 22px; height: 22px; padding: 0 5px;
   border-radius: 6px;
   font-family: var(--mono); font-size: 14px; font-weight: 700; letter-spacing: 0; text-transform: none;
   color: var(--accent);
@@ -440,6 +447,7 @@ h1 {
 }
 .subtitle { margin-top: 4px; font-size: 14px; color: var(--text-2); letter-spacing: .02em; }
 
+.galleries { flex: none; display: flex; gap: 8px; }
 .gallery {
   flex: none;
   width: 112px; height: 112px;

@@ -12,3 +12,6 @@ dist/
 
 *.md
 *.ps1
+
+# --- 本地截图工具 (chrome-headless-shell) ---
+chrome-cache/

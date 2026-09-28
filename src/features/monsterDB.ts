@@ -305,6 +305,7 @@ export class MonsterDB {
       name,
       chineseName: translatedName,
       variant: variantData.variant,
+      prefix: variantData.prefix,
       symbol: monster.symbol,
       color: monster.color,
       baseLevel: monster['base-level'],
