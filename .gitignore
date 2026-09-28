@@ -3,6 +3,7 @@ node_modules/
 package-lock.json
 yarn.lock
 pnpm-lock.yaml
+data/
 
 # --- 编译产物 (TypeScript/Build) ---
 lib/
