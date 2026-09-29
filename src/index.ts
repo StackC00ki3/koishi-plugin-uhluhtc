@@ -2,7 +2,8 @@ import { Context, Schema, h } from 'koishi'
 import { MonsterDB } from './features/monsterDB'
 import { Translation } from './features/translation'
 import { Tiles } from './features/tiles'
-import { MonsterCardRenderer } from './features/cardRenderer'
+import { CardRenderer } from './features/cardRenderer'
+import { ItemDB } from './features/itemDB'
 import { registerCanvasFonts } from './features/fonts'
 import { setupLejiuFeatures } from './features/lejiu'
 import * as fs from 'fs'
@@ -10,7 +11,7 @@ import * as path from 'path'
 
 export const name = 'uhluhtc'
 
-// 怪物卡片通过 puppeteer 把网页截图成图片，未安装时退回文字版
+// 怪物/物品卡片通过 puppeteer 把网页截图成图片，未安装时退回文字版
 export const inject = {
   optional: ['puppeteer'],
 }
@@ -90,7 +91,7 @@ export async function apply(ctx: Context, config: Config) {
   if (!fs.existsSync(dataRoot)) {
     fs.mkdirSync(dataRoot, { recursive: true })
     logger.warn(`数据目录不存在，已创建: ${dataRoot}`)
-    logger.warn('运行数据不再内置，请将 fonts、monsterDB、tilesets、fortune_cookies、oracle、nethack_tips、locales、lejiu 等目录放入该目录')
+    logger.warn('运行数据不再内置，请将 fonts、monsterDB、itemDB、tilesets、fortune_cookies、oracle、nethack_tips、locales、lejiu 等目录放入该目录')
   }
   const fontsDir = path.join(dataRoot, 'fonts')
   const loadedFontCount = registerCanvasFonts(fontsDir)
@@ -112,11 +113,12 @@ export async function apply(ctx: Context, config: Config) {
   const tiles = new Tiles(tilesDataPath, logger)
   await tiles.init()
 
-  const cardRenderer = new MonsterCardRenderer(ctx, fontsDir)
+  const cardRenderer = new CardRenderer(ctx, fontsDir)
   if (!cardRenderer.available) {
-    logger.warn('未检测到 puppeteer 服务，怪物卡片将以文字发送；启用 koishi-plugin-puppeteer 后可生成图片卡片')
+    logger.warn('未检测到 puppeteer 服务，怪物/物品卡片将以文字发送；启用 koishi-plugin-puppeteer 后可生成图片卡片')
   }
   const monsterDB = new MonsterDB(monsterDBDataPath, logger, tiles, cardRenderer)
+  const itemDB = new ItemDB(path.join(dataRoot, 'itemDB'), logger, tiles, cardRenderer)
   const translation = new Translation(dataRoot, logger)
 
   const fortuneCookiesPath = path.join(dataRoot, 'fortune_cookies')
@@ -164,6 +166,7 @@ export async function apply(ctx: Context, config: Config) {
   }
 
   logger.info(`已加载 ${monsterDB.getVariantCount()} 个变体的怪物数据库`)
+  logger.info(`已加载 ${itemDB.getItemCount()} 个物品`)
   logger.info(`已加载 ${tiles.tilesetCount} 个图块集`)
   logger.info(`已加载 ${trueLines.length} 条幸运饼干真签文，${falseLines.length} 条假签文`)
   logger.info(`已加载 ${oracleLines.length} 条神谕文本`)
@@ -178,13 +181,14 @@ export async function apply(ctx: Context, config: Config) {
       if (!session || !isSessionEnabled(session)) return
       return '功能：\n' +
         '1.查询怪物[中文] 发送怪物图鉴 ; 查询怪物[英文] 在所有nh分支中搜索该怪物并发送可选列表\n' +
-        '2.翻译消息中的怪物名称: 翻译 [需要翻译的内容]\n' +
-        '3.查询怪物详细信息： #[分支简称]?[英文怪兽名] （分支简称可用查询怪物[英文]来获取）\n' +
-        '4.生成 nethack 怪物赛跑 GIF：怪物赛跑 [怪物1,怪物2,...]（默认原版，可写 分支?怪物名）\n' +
-        '5.幸运饼干（别名：幸运曲奇/吃饼干/吃曲奇）: 抽取幸运饼干签文\n' +
-        '6.神谕: 抽取神谕文本\n' +
-        `7.nh小贴士: 聊天触发关键字后，按 ${(tipSendProbability * 100).toFixed(0)}% 概率启动倒计时，若 10 分钟无人发言自动推送\n` +
-        '8.乐九功能: 漂流瓶 / 图片漂流瓶 / 查看漂流瓶 / 换漂流瓶 / 换空瓶 / 塔罗牌 / 固定回复'
+        '2.查询物品[中文或英文] 发送原版物品图鉴（数据来自 NetHackWiki）\n' +
+        '3.翻译消息中的怪物名称: 翻译 [需要翻译的内容]\n' +
+        '4.查询怪物详细信息： #[分支简称]?[英文怪兽名] （分支简称可用查询怪物[英文]来获取）\n' +
+        '5.生成 nethack 怪物赛跑 GIF：怪物赛跑 [怪物1,怪物2,...]（默认原版，可写 分支?怪物名）\n' +
+        '6.幸运饼干（别名：幸运曲奇/吃饼干/吃曲奇）: 抽取幸运饼干签文\n' +
+        '7.神谕: 抽取神谕文本\n' +
+        `8.nh小贴士: 聊天触发关键字后，按 ${(tipSendProbability * 100).toFixed(0)}% 概率启动倒计时，若 10 分钟无人发言自动推送\n` +
+        '9.乐九功能: 漂流瓶 / 图片漂流瓶 / 查看漂流瓶 / 换漂流瓶 / 换空瓶 / 塔罗牌 / 固定回复'
     })
 
   // 幸运饼干
@@ -276,6 +280,18 @@ export async function apply(ctx: Context, config: Config) {
           return result.text
         }
       }
+    })
+
+  // 查询物品
+  ctx.command('查询物品 <name:text>', '查询物品图鉴')
+    .action(async (argv, name) => {
+      const session = argv.session
+      if (!session || !isSessionEnabled(session)) return
+      const result = await itemDB.queryItem(name)
+      if (result.image) {
+        return h.image(result.image, 'image/png')
+      }
+      return result.text
     })
 
   // 翻译怪物名称

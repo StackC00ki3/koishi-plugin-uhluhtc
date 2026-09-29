@@ -41,13 +41,13 @@ export interface MonsterCardData {
   tileImages?: Buffer[]  // 32×32 怪物贴图（每个 tileset 一张，最多 4 张）
 }
 
-const CARD_W = 460
+export const CARD_W = 460
 // 2 倍像素密度：32px 贴图按 48/96 CSS px 显示时恰好是整数倍放大，像素画不会糊
 const SCALE = 2
 
 // ── 配色 ────────────────────────────────────────────────────────────────────
 // 主题色取自怪物在终端中的颜色，按深色背景重新调校亮度
-const NH_COLORS: Record<string, string> = {
+export const NH_COLORS: Record<string, string> = {
   black: '#8490aa',
   red: '#ff5c5c',
   green: '#3fcf6e',
@@ -107,16 +107,20 @@ const DAMAGE_ELEMENTS: Record<string, string> = {
   AdDeath: 'death',
 }
 
-/** 通过 puppeteer 把怪物卡片网页截图成 PNG */
-export class MonsterCardRenderer {
-  constructor(private ctx: Context, private fontsDir: string) {}
+/** 通过 puppeteer 把图鉴卡片网页截图成 PNG */
+export class CardRenderer {
+  constructor(private ctx: Context, readonly fontsDir: string) {}
 
   get available(): boolean {
     return !!this.ctx.puppeteer
   }
 
-  async render(data: MonsterCardData): Promise<Buffer> {
-    const html = buildMonsterCardHtml(data, this.fontsDir)
+  renderMonster(data: MonsterCardData): Promise<Buffer> {
+    return this.renderHtml(buildMonsterCardHtml(data, this.fontsDir))
+  }
+
+  /** 截取网页中的 .card 元素 */
+  async renderHtml(html: string): Promise<Buffer> {
     // 页面需以 file:// 打开才能引用本地字体，about:blank 下会被浏览器拦截
     const htmlPath = path.join(os.tmpdir(), `uhluhtc-card-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.html`)
     await fs.promises.writeFile(htmlPath, html)
@@ -170,7 +174,7 @@ ${Object.entries(ELEMENT_COLORS).map(([el, hex]) => `.el-${el} { --c: ${rgbChann
       <h1>${esc(title)}</h1>
       ${subtitle ? `<div class="subtitle">${esc(subtitle)}</div>` : ''}
     </div>
-    ${renderGallery(data)}
+    ${renderGallery(data.tileImages, data.symbol)}
   </header>
   ${sections}
   <footer><span>NetHack 怪物图鉴</span><span class="mono">uhluhtc</span></footer>
@@ -179,9 +183,10 @@ ${Object.entries(ELEMENT_COLORS).map(([el, hex]) => `.el-${el} { --c: ${rgbChann
 </html>`
 }
 
-function renderGallery(data: MonsterCardData): string {
-  const imgs = (data.tileImages || []).slice(0, 4)
-  const symbol = data.symbol?.trim()
+/** 标题区右侧的贴图：多张时 2×2 排列，并在左侧附上 ASCII 符号 */
+export function renderGallery(tileImages: Buffer[] | undefined, glyphText: string | undefined): string {
+  const imgs = (tileImages || []).slice(0, 4)
+  const symbol = glyphText?.trim()
   const glyph = (text: string) => `<div class="gallery"><span class="big-glyph">${esc(text)}</span></div>`
   if (imgs.length === 0) return glyph(symbol || '?')
 
@@ -198,12 +203,13 @@ function renderGallery(data: MonsterCardData): string {
   return symbol ? `<div class="galleries">${glyph(symbol)}${tiles}</div>` : tiles
 }
 
-interface StatItem {
+export interface StatItem {
   label: string
   value: string
   extra?: string       // 数值后的小字
   tone?: 'accent' | 'lawful' | 'chaotic'
   meter?: number       // 0~1，底部进度条
+  note?: string        // 数值下方的小字说明
   parts?: Array<[string, string]>  // 多段数值（dNetHack 系的 AC），替代 value 显示
 }
 
@@ -226,8 +232,11 @@ function renderStats(data: MonsterCardData): string {
   if (data.size) stats.push({ label: '体型', value: sizeLabel(data.size) })
   if (data.weight !== undefined) stats.push({ label: '重量', value: String(data.weight) })
   if (data.nutrition !== undefined) stats.push({ label: '营养价值', value: String(data.nutrition) })
-  if (stats.length === 0) return ''
+  return renderStatGrid(stats)
+}
 
+export function renderStatGrid(stats: StatItem[]): string {
+  if (stats.length === 0) return ''
   const cells = stats.map(s => {
     const tone = s.tone ? ` tone-${s.tone}` : ''
     const value = s.parts
@@ -237,6 +246,7 @@ function renderStats(data: MonsterCardData): string {
     <div class="stat${s.meter !== undefined ? ' has-meter' : ''}">
       <div class="stat-k">${esc(s.label)}</div>
       ${value}
+      ${s.note ? `<div class="stat-note">${esc(s.note)}</div>` : ''}
       ${s.meter !== undefined ? `<div class="meter"><i style="width: ${(s.meter * 100).toFixed(1)}%"></i></div>` : ''}
     </div>`
   })
@@ -294,7 +304,7 @@ function renderFlags(data: MonsterCardData): string {
 }
 
 // ── 片段 ────────────────────────────────────────────────────────────────────
-function panel(title: string, body: string, badge?: string): string {
+export function panel(title: string, body: string, badge?: string): string {
   return `
   <section class="panel">
     <h2>${esc(title)}${badge ? `<span class="badge mono">${esc(badge)}</span>` : ''}</h2>
@@ -302,11 +312,11 @@ function panel(title: string, body: string, badge?: string): string {
   </section>`
 }
 
-function kvRow(label: string, content: string): string {
+export function kvRow(label: string, content: string): string {
   return `<div class="kv"><span class="kv-k">${esc(label)}</span><div class="chips">${content}</div></div>`
 }
 
-function chip(text: string, tone?: 'accent' | 'warn'): string {
+export function chip(text: string, tone?: 'accent' | 'warn'): string {
   return `<span class="chip${tone ? ` chip-${tone}` : ''}">${esc(text)}</span>`
 }
 
@@ -353,7 +363,7 @@ function sizeLabel(size: string): string {
   }
 }
 
-function fontFaces(fontsDir: string): string {
+export function fontFaces(fontsDir: string): string {
   const face = (family: string, files: string[]) => {
     const urls = files
       .map(file => path.join(fontsDir, file))
@@ -372,16 +382,16 @@ function dataUrl(buf: Buffer): string {
   return `data:image/png;base64,${buf.toString('base64')}`
 }
 
-function rgbChannels(hex: string): string {
+export function rgbChannels(hex: string): string {
   const n = parseInt(hex.slice(1), 16)
   return `${(n >> 16) & 255} ${(n >> 8) & 255} ${n & 255}`
 }
 
-function esc(text: string): string {
+export function esc(text: string): string {
   return text.replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]!))
 }
 
-const STYLE = `
+export const STYLE = `
 :root {
   --bg-top: #141821;
   --bg-bottom: #0b0d12;
@@ -493,6 +503,7 @@ h1 {
 .stat-v.tone-accent { color: var(--accent); }
 .stat-v.tone-lawful { color: var(--lawful); }
 .stat-v.tone-chaotic { color: var(--chaotic); }
+.stat-note { margin-top: 2px; font-size: 11px; color: var(--text-3); }
 .stat-parts { margin-top: 2px; display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--text-3); }
 .stat-parts div { display: flex; justify-content: space-between; align-items: baseline; }
 .stat-parts b { font-size: 15px; color: var(--text); }

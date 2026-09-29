@@ -471,7 +471,15 @@ export class Tiles {
      */
     genImage(monName: string): Buffer[] {
         const idx = TILE_MAP.indexOf(monName)
-        if (idx === -1 || this.tilesets.length === 0) return []
+        if (idx === -1) return []
+        return this.genImageAt(idx)
+    }
+
+    /**
+     * 按 NetHack 3.6 tileset 中的绝对位置提取 32×32 贴图（怪物在前，物品从第 394 格开始）。
+     */
+    genImageAt(idx: number): Buffer[] {
+        if (idx < 0 || this.tilesets.length === 0) return []
 
         return this.tilesets.map(tileset => {
             const tilesInLine = 40

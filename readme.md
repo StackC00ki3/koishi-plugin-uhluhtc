@@ -7,7 +7,7 @@ NetHack information query plugin for Koishi
 ## 功能
 
 - [x] 查询 nethack 怪物图鉴
-- [ ] 查询 nethack 物品图鉴 (龙龙)
+- [x] 查询 nethack 物品图鉴 (龙龙)
 - [x] 支持 nethack 中英怪物名互译
 - [x] 支持检索 nethack分支的怪物
 - [x] 支持生成怪物赛跑 GIF
@@ -55,7 +55,24 @@ NetHack information query plugin for Koishi
 - 查询怪物 巨蚁
 - 查询怪物 fox
 
-### 4. 查询怪物详细信息
+### 4. 查询物品
+
+- 查询物品 <名称>
+
+行为：
+
+- 发送原版 NetHack 物品图鉴卡片，中英文名均可，也支持汉化版译名和武士的别名（如 旭日剑、筝）
+- 名称对应多个物品时（如 传送），返回可选列表
+- 输入未鉴定时的外观（如 灰色的石头、圆形护身符）时，说明可能对应的物品
+- 找不到时返回名称相近的物品
+
+示例：
+
+- 查询物品 匕首
+- 查询物品 银龙鳞甲
+- 查询物品 wand of wishing
+
+### 5. 查询怪物详细信息
 
 格式：
 
@@ -67,7 +84,7 @@ NetHack information query plugin for Koishi
 - #u?giant ant
 - #x?巨蚁
 
-### 5. 翻译怪物名称
+### 6. 翻译怪物名称
 
 - 翻译 <文本>
 
@@ -81,7 +98,7 @@ NetHack information query plugin for Koishi
 - 翻译 giant ant
 - 翻译 狐狸
 
-### 6. 怪物赛跑 GIF
+### 7. 怪物赛跑 GIF
 
 - 怪物赛跑 <怪物1,怪物2,...>
 
@@ -96,7 +113,7 @@ NetHack information query plugin for Koishi
 - 怪物赛跑 狐狸,wolf,dog
 - 怪物赛跑 u?fox,v?wolf,x?dog
 
-### 7. 幸运饼干
+### 8. 幸运饼干
 
 - 幸运饼干
 
@@ -110,7 +127,7 @@ NetHack information query plugin for Koishi
 
 - 抽取幸运饼干签文
 
-### 8. 神谕
+### 9. 神谕
 
 - 神谕
 
@@ -118,7 +135,7 @@ NetHack information query plugin for Koishi
 
 - 抽取一条神谕文本
 
-### 9. nh小贴士
+### 10. nh小贴士
 
 行为：
 
@@ -127,7 +144,7 @@ NetHack information query plugin for Koishi
 - 若 10 分钟内该会话无人发言，自动推送一条命中关键词的小贴士
 - 若命中多条，则随机抽取一条发送
 
-### 10. 乐九功能
+### 11. 乐九功能
 
 - 塔罗牌
 - 查看漂流瓶
@@ -190,9 +207,10 @@ NetHack information query plugin for Koishi
 说明：
 
 - 插件会尝试使用 dataPath 目录，并在目录不存在时自动创建。
-- dataPath 默认目录结构应包含 fonts、monsterDB、tilesets、fortune_cookies、oracle、nethack_tips、locales、lejiu 等目录。
+- dataPath 默认目录结构应包含 fonts、monsterDB、itemDB、tilesets、fortune_cookies、oracle、nethack_tips、locales、lejiu 等目录。
 - 若使用自定义数据，请将字体放入 dataPath/fonts，怪物 YAML 数据放入 dataPath/monsterDB，tilesets 放入 dataPath/tilesets。怪物数据来源可参考：
 	https://github.com/UnNetHack/pinobot/tree/master/variants
+- 物品数据 dataPath/itemDB/items.json 由 `node scripts/fetch-item-data.js [输出目录]` 从 NetHack Wiki 抓取生成（需要 Node 18+），物品贴图取自 tilesets 中的 3.6 版 tileset。
 
 ## 致谢
 
@@ -201,6 +219,8 @@ NetHack information query plugin for Koishi
 龙龙：nethack 物品数据，神谕，幸运曲奇，漂流瓶，小贴士
 
 pinobot: nethack 原版及分支的怪物数据
+
+[NetHackWiki](https://nethackwiki.com): nethack 物品数据与简中译名
 
 
 ## 许可证

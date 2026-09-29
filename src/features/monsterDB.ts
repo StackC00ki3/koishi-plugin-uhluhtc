@@ -3,7 +3,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { Translation } from './translation'
 import { Tiles } from './tiles'
-import { MonsterCardRenderer, MonsterCardData } from './cardRenderer'
+import { CardRenderer, MonsterCardData } from './cardRenderer'
 import { renderMonsterRaceGif, RaceParticipant } from './raceRenderer'
 import { Logger } from 'koishi'
 
@@ -25,7 +25,7 @@ export class MonsterDB {
     private dataPath: string,
     private logger: Logger,
     private tiles?: Tiles,
-    private cardRenderer?: MonsterCardRenderer,
+    private cardRenderer?: CardRenderer,
   ) {
     this.loadDatabase()
   }
@@ -349,7 +349,7 @@ export class MonsterDB {
 
     // 渲染图鉴卡片，失败时同样退回文字版
     try {
-      const cardBuffer = await this.cardRenderer.render(cardData)
+      const cardBuffer = await this.cardRenderer.renderMonster(cardData)
       return { text: null, images: [cardBuffer] }
     } catch (e) {
       this.logger.warn('渲染怪物卡片失败，改为发送文字', e)
