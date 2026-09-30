@@ -210,7 +210,7 @@ export interface StatItem {
   tone?: 'accent' | 'lawful' | 'chaotic'
   meter?: number       // 0~1，底部进度条
   note?: string        // 数值下方的小字说明
-  parts?: Array<[string, string]>  // 多段数值（dNetHack 系的 AC），替代 value 显示
+  parts?: Array<[string, string, string?, boolean?]>  // 多段数值（dNetHack 系的 AC、物品卡的伤害），替代 value 显示；第三项是数值后的小字，第四项为真时用小字号
 }
 
 function renderStats(data: MonsterCardData): string {
@@ -240,7 +240,7 @@ export function renderStatGrid(stats: StatItem[]): string {
   const cells = stats.map(s => {
     const tone = s.tone ? ` tone-${s.tone}` : ''
     const value = s.parts
-      ? `<div class="stat-parts${tone}">${s.parts.map(([k, v]) => `<div><span>${esc(k)}</span><b class="mono">${esc(v)}</b></div>`).join('')}</div>`
+      ? `<div class="stat-parts${tone}">${s.parts.map(([k, v, x, small]) => `<div><span>${esc(k)}</span><b class="mono${small ? ' sm' : ''}">${esc(v)}</b>${x ? `<small>${esc(x)}</small>` : ''}</div>`).join('')}</div>`
       : `<div class="stat-v${tone}${s.value.length > 6 ? ' long' : ''}">${esc(s.value)}${s.extra ? `<small>${esc(s.extra)}</small>` : ''}</div>`
     return `
     <div class="stat${s.meter !== undefined ? ' has-meter' : ''}">
@@ -507,6 +507,12 @@ h1 {
 .stat-parts { margin-top: 2px; display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--text-3); }
 .stat-parts div { display: flex; justify-content: space-between; align-items: baseline; }
 .stat-parts b { font-size: 15px; color: var(--text); }
+.stat-parts b small { margin-left: 4px; font-size: 11px; font-weight: 400; color: var(--text-3); }
+/* 伤害的表达式里有「+特殊」这类估不出数值的部分，整体缩小以免撑出格子 */
+.stat-parts b.sm { font-size: 13px; }
+/* 取值范围另起一行，不挤在数值后面（宽度不够时会被浏览器断在中间，如 "4-" / "18"） */
+.stat-parts > div { flex-wrap: wrap; }
+.stat-parts div > small { flex: none; }
 .stat-parts.tone-accent b { color: var(--accent); }
 .meter { position: absolute; left: 12px; right: 12px; bottom: 9px; height: 3px; border-radius: 3px; background: rgb(255 255 255 / 8%); overflow: hidden; }
 .meter i { display: block; height: 100%; border-radius: 3px; background: var(--accent); }

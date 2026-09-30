@@ -15,11 +15,10 @@ interface ItemRecord {
   glyph: string
   color: string
   tileIndex?: number     // 在 NetHack 3.6 tileset 中的绝对位置
-  wikiTile?: string      // wiki 上的 16×16 贴图（base64 PNG），tileset 中没有时使用
   page: string
   stats: Array<{ label: string; value: string; note?: string }>
   lists: Array<{ label: string; values: string[] }>
-  summary?: string
+  summary?: string       // wiki「描述」章节的简明介绍
 }
 
 /** 未鉴定时的外观 */
@@ -151,8 +150,7 @@ export class ItemDB {
   }
 
   private toCardData(item: ItemRecord): ItemCardData {
-    let tileImages = item.tileIndex !== undefined ? this.tiles?.genImageAt(item.tileIndex) ?? [] : []
-    if (tileImages.length === 0 && item.wikiTile) tileImages = [Buffer.from(item.wikiTile, 'base64')]
+    const tileImages = item.tileIndex !== undefined ? this.tiles?.genImageAt(item.tileIndex) ?? [] : []
     return {
       name: item.name,
       chineseName: item.zhName,
