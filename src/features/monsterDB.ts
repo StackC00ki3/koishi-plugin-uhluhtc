@@ -263,7 +263,7 @@ export class MonsterDB {
     // 生成信息
     if (monster.generates) {
       const generates = String(monster.generates)
-        .replace('gehennom', '欣嫩谷')
+        .replace('gehennom', '葛汉诺姆')
         .replace('dungeons', '命运地牢')
         .replace('unique', '唯一')
       result += `\n生成于: ${generates}`
@@ -321,7 +321,7 @@ export class MonsterDB {
       size: monster.size,
       generates: generates
         .filter(g => g !== 'unique')
-        .map(g => g.replace('gehennom', '欣嫩谷').replace('dungeons', '命运地牢')),
+        .map(g => g.replace('gehennom', '葛汉诺姆').replace('dungeons', '命运地牢')),
       unique: generates.includes('unique'),
       notGeneratedNormally: monster['not-generated-normally'] === 'Yes',
       appearsInSmallGroups: monster['appears-in-small-groups'] === 'Yes',
