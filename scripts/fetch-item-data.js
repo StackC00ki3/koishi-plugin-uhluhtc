@@ -2,18 +2,26 @@
 // 数据来源：
 //   - NetHackWiki:简中译名标准化 —— 物品的中英文名（只收录其中列出的原版物品）
 //   - 各物品页面的信息框，经 MediaWiki API 渲染以带上模板里的默认值（如戒指重量）
-//   - 物品的 /zh-CN 子页面 —— 中文名与简介
+//   - 物品的 /zh-CN 子页面 —— 中文名与「描述」章节（图鉴简介）
 //   - NetHack 3.6 的 win/share/objects.txt —— 物品在 3.6 tileset 中的位置
 // 需要 Node 18+（使用全局 fetch）
 // 用法: node scripts/fetch-item-data.js [输出目录，默认 data/uhluhtc/itemDB]
 const fs = require('fs')
 const path = require('path')
+const {
+  API, WIKI, USER_AGENT, sleep, request, api, chunk, fetchWikitexts, renderSnippets,
+  topLevelTemplates, templateParams, stripRefs, stripCitations, stripStandaloneTemplates,
+  sectionBody, stripTables, dropListItems, expandFractions, decodeEntities, htmlToText,
+} = require('./wiki-api')
 
-const API = 'https://nethackwiki.com/api.php'
-const WIKI = 'https://nethackwiki.com'
-const OBJECTS_TXT = 'https://raw.githubusercontent.com/NetHack/NetHack/NetHack-3.6/win/share/objects.txt'
-const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36'
+// 同一个文件的两个来源：raw.githubusercontent 在国内网络下常被阻断，故优先用 jsDelivr 镜像
+const OBJECTS_TXT_SOURCES = [
+  'https://cdn.jsdelivr.net/gh/NetHack/NetHack@NetHack-3.6/win/share/objects.txt',
+  'https://raw.githubusercontent.com/NetHack/NetHack/NetHack-3.6/win/share/objects.txt',
+]
 const GLOSSARY_PAGE = 'NetHackWiki:简中译名标准化'
+// 同一批东西在原版页面与 /zh-CN 本地化页面上的章节名
+const SECTION_NAMES = { summary: ['描述', 'Description'], generation: ['生成', 'Generation'] }
 // 3.6 tileset 中怪物占前 394 格，物品紧随其后
 const MONSTER_TILE_COUNT = 394
 
@@ -181,15 +189,15 @@ const PHRASES = {
   'displacement': '移形换影',
   'invisibility': '隐形',
   'magic resistance': '魔法抗性',
-  'acid resistance': '强酸抵抗',
-  'poison resistance': '毒素抵抗',
-  'fire resistance': '火焰抵抗',
-  'cold resistance': '寒冷抵抗',
-  'drain resistance': '吸取抵抗',
-  'shock resistance': '电击抵抗',
-  'sleep resistance': '睡眠抵抗',
-  'hallucination resistance': '幻觉抵抗',
-  'disintegration resistance': '解离抵抗',
+  'acid resistance': '强酸抗性',
+  'poison resistance': '毒素抗性',
+  'fire resistance': '火焰抗性',
+  'cold resistance': '寒冷抗性',
+  'drain resistance': '吸取抗性',
+  'shock resistance': '电击抗性',
+  'sleep resistance': '睡眠抗性',
+  'hallucination resistance': '幻觉抗性',
+  'disintegration resistance': '解离抗性',
   'stealth': '潜行',
   'telepathy': '心灵感应',
   'jumping': '跳跃',
@@ -270,10 +278,10 @@ const PHRASES = {
   // 克制对象
   'orcs': '兽人', 'major demons': '大恶魔', 'dragons': '龙', 'giants': '巨人', 'ogres': '食人魔',
   'trolls': '巨魔', 'undead': '亡灵', 'werecreatures': '兽化人', 'cross-aligned': '阵营相异者',
-  'not drain resistant': '无吸取抵抗者',
-  'targets without fire resistance': '无火焰抵抗者',
-  'targets without cold resistance': '无寒冷抵抗者',
-  'non-shock resistant': '无电击抵抗者',
+  'not drain resistant': '无吸取抗性',
+  'targets without fire resistance': '无火焰抗性',
+  'targets without cold resistance': '无寒冷抗性',
+  'non-shock resistant': '无电击抗性',
   'monsters that fail mr score check': '未通过魔抗检定的怪物',
   'heroes without magic resistance': '无魔法抗性的玩家',
   'demons': '恶魔',
@@ -309,47 +317,19 @@ const GEM_COLORS = {
 }
 
 // ── 网络 ────────────────────────────────────────────────────────────────────
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
-
-async function request(url, init = {}, retries = 3) {
-  for (let attempt = 1; ; attempt++) {
+/** 逐个来源尝试下载 objects.txt */
+async function fetchObjectsTxt() {
+  let lastError
+  for (const url of OBJECTS_TXT_SOURCES) {
     try {
-      const resp = await fetch(url, { ...init, headers: { 'User-Agent': USER_AGENT, ...init.headers } })
-      if (!resp.ok) throw new Error(`HTTP ${resp.status} ${url}`)
-      return resp
+      const text = await (await request(url)).text()
+      if (text.includes('# tile ')) return text
+      lastError = new Error(`内容异常（缺少 tile 定义）: ${url}`)
     } catch (e) {
-      if (attempt >= retries) throw e
-      await sleep(1000 * attempt)
+      lastError = e
     }
   }
-}
-
-async function api(params) {
-  const body = new URLSearchParams({ ...params, format: 'json', formatversion: '2' })
-  const resp = await request(API, { method: 'POST', body })
-  const data = await resp.json()
-  if (data.error) throw new Error(`API 错误: ${data.error.info}`)
-  await sleep(300)
-  return data
-}
-
-function chunk(list, size) {
-  const out = []
-  for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size))
-  return out
-}
-
-/** 批量读取页面源码，返回 标题 → 源码（不存在的页面不在结果中） */
-async function fetchWikitexts(titles) {
-  const result = new Map()
-  for (const batch of chunk(Array.from(new Set(titles)), 50)) {
-    const data = await api({ action: 'query', prop: 'revisions', rvprop: 'content', rvslots: 'main', titles: batch.join('|') })
-    for (const page of data.query.pages) {
-      if (page.missing || !page.revisions) continue
-      result.set(page.title, page.revisions[0].slots.main.content)
-    }
-  }
-  return result
+  throw lastError
 }
 
 /** 批量解析标题（含大小写规范化与重定向），返回 原标题 → { title, fragment } */
@@ -369,76 +349,6 @@ async function resolveTitles(titles) {
     }
   }
   return result
-}
-
-/** 批量渲染 wikitext 片段，返回与输入顺序对应的 HTML */
-async function renderSnippets(snippets) {
-  const out = new Array(snippets.length).fill('')
-  const indexed = snippets.map((text, i) => ({ text, i }))
-  for (const batch of chunk(indexed, 40)) {
-    const text = batch.map(({ text, i }) => `<div class="uhl-sep" id="uhl-${i}"></div>\n${text}\n`).join('\n')
-    const data = await api({ action: 'parse', text, prop: 'text', contentmodel: 'wikitext', disablelimitreport: '1', title: 'Item' })
-    const parts = data.parse.text.split(/<div class="uhl-sep" id="uhl-(\d+)"><\/div>/)
-    for (let k = 1; k < parts.length; k += 2) out[Number(parts[k])] = parts[k + 1]
-  }
-  return out
-}
-
-async function fetchImageUrls(files) {
-  const result = new Map()
-  for (const batch of chunk(Array.from(new Set(files)), 50)) {
-    const data = await api({ action: 'query', prop: 'imageinfo', iiprop: 'url', titles: batch.map(f => `File:${f}`).join('|') })
-    const normalized = new Map((data.query.normalized || []).map(n => [n.to, n.from]))
-    for (const page of data.query.pages) {
-      const url = page.imageinfo?.[0]?.url
-      if (url) result.set((normalized.get(page.title) || page.title).replace(/^File:/, ''), url)
-    }
-  }
-  return result
-}
-
-// ── wikitext 处理 ───────────────────────────────────────────────────────────
-/** 找出所有顶层模板调用，正确处理嵌套 */
-function topLevelTemplates(text) {
-  const out = []
-  let i = 0
-  while ((i = text.indexOf('{{', i)) !== -1) {
-    let depth = 0
-    let j = i
-    for (; j < text.length; j++) {
-      if (text.startsWith('{{', j)) { depth++; j++ } else if (text.startsWith('}}', j)) { depth--; j++; if (depth === 0) break }
-    }
-    const body = text.slice(i, j + 1)
-    out.push({ name: body.slice(2).split(/[|}\n]/)[0].trim(), body, start: i, end: j + 1 })
-    i = j + 1
-  }
-  return out
-}
-
-/** 拆分模板参数（忽略嵌套模板和链接里的竖线） */
-function templateParams(body) {
-  const inner = body.replace(/^\{\{[^|}]*/, '').replace(/\}\}$/, '')
-  const params = {}
-  let depth = 0
-  let current = ''
-  const parts = []
-  for (let i = 0; i < inner.length; i++) {
-    const pair = inner.slice(i, i + 2)
-    if (pair === '{{' || pair === '[[') { depth++; current += pair; i++; continue }
-    if (pair === '}}' || pair === ']]') { depth--; current += pair; i++; continue }
-    if (inner[i] === '|' && depth === 0) { parts.push(current); current = ''; continue }
-    current += inner[i]
-  }
-  parts.push(current)
-  for (const part of parts) {
-    const match = part.match(/^\s*([\w ]+?)\s*=([\s\S]*)$/)
-    if (match) params[match[1].toLowerCase()] = match[2].trim()
-  }
-  return params
-}
-
-function stripRefs(text) {
-  return text.replace(/<ref[^>]*\/>/g, '').replace(/<ref[^>]*>[\s\S]*?<\/ref>/g, '').trim()
 }
 
 // ── 译名表 ──────────────────────────────────────────────────────────────────
@@ -494,32 +404,10 @@ function capitalize(text) {
 }
 
 // ── 信息框解析 ──────────────────────────────────────────────────────────────
-function decodeEntities(text) {
-  return text
-    .replace(/&nbsp;|&#160;|&ensp;|&emsp;/g, ' ')
-    .replace(/&ndash;|&#8211;/g, '–')
-    .replace(/&minus;|&#8722;/g, '−')
-    .replace(/&times;|&#215;/g, '×')
-    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#0?39;/g, "'")
-    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
-    .replace(/&amp;/g, '&')
-}
-
-function htmlToText(html) {
-  return decodeEntities(html
-    .replace(/<sup[\s\S]*?<\/sup>/g, '')
-    .replace(/<br\s*\/?>/g, ' ')
-    .replace(/<[^>]+>/g, ''))
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
 function parseInfoboxHtml(html) {
   const table = html.match(/<table[\s\S]*?<\/table>/)?.[0] || ''
   const header = table.match(/<th[^>]*colspan[^>]*>([\s\S]*?)<\/th>/)?.[1] || ''
   const sym = header.match(/<span class="nhsym clr-([\w-]+)">([\s\S]*?)<\/span>/)
-  const img = header.match(/<img [^>]*src="([^"]+)"/)
   const rows = []
   for (const tr of table.matchAll(/<tr>([\s\S]*?)<\/tr>/g)) {
     const cells = tr[1].match(/<th(?![^>]*colspan)[^>]*>([\s\S]*?)<\/th>\s*<td[^>]*>([\s\S]*?)<\/td>/)
@@ -533,7 +421,6 @@ function parseInfoboxHtml(html) {
   return {
     glyph: sym ? htmlToText(sym[2]) : '',
     colorClass: sym ? sym[1] : '',
-    tileUrl: img ? new URL(decodeEntities(img[1]), WIKI).href : '',
     rows,
   }
 }
@@ -554,13 +441,11 @@ function parseGemTable(text) {
     const [symCell, nameCell, desc, cost, weight, hardness, prob, material] = cells
     const name = nameCell.replace(/'''/g, '').replace(/\[\[(?:[^\]|]*\|)?([^\]]*)\]\]/g, '$1').trim().toLowerCase()
     const color = symCell.match(/\{\{\s*([\w ]+?)\s*\|/)?.[1] || 'white'
-    const tile = symCell.match(/\[\[Image:([^\]|]+)/i)?.[1]?.trim() || ''
     const plain = s => decodeEntities(s.replace(/\[\[(?:[^\]|]*\|)?([^\]]*)\]\]/g, '$1')).replace(/\s+/g, ' ').trim()
     const lines = s => s.split(/<br\s*\/?>/).map(plain).filter(Boolean)
     gems.set(name, {
       glyph: '*',
       color: color.replace(/\s/g, ''),
-      tileFile: tile,
       rows: [
         { label: 'Appearance', text: lines(desc).join(' '), items: [], lines: lines(desc) },
         { label: 'Base price', text: `${plain(cost)} zm`, items: [] },
@@ -607,18 +492,31 @@ function findTileIndex(objectTiles, stub, englishNames) {
   return undefined
 }
 
-// ── 简介 ────────────────────────────────────────────────────────────────────
-/** 取 /zh-CN 页面中第一段带粗体物品名的正文 */
+// ── 简介与「生成」 ──────────────────────────────────────────────────────────
+/** 页面中第一段带粗体物品名的正文 */
 function leadParagraph(text) {
-  // 去掉独占整行的模板（信息框、提示框等），保留段落内的行内模板
-  let body = text
-  for (const t of topLevelTemplates(text).reverse()) {
-    const lineStart = t.start === 0 || text[t.start - 1] === '\n'
-    const lineEnd = t.end >= text.length || text[t.end] === '\n'
-    if (lineStart && lineEnd) body = body.slice(0, t.start) + body.slice(t.end)
-  }
-  const paragraphs = body.split(/\n\s*\n|\n(?===)/).map(p => p.trim())
+  const paragraphs = stripStandaloneTemplates(text).split(/\n\s*\n|\n(?===)/).map(p => p.trim())
   return paragraphs.find(p => p.includes("'''") && !/^(==|\{\||\||!|\*|#)/.test(p)) || ''
+}
+
+/** 取首个正文段落，跳过列表、表格、HTML 块与整段模板 */
+function firstParagraph(text) {
+  const paragraphs = stripStandaloneTemplates(text).split(/\n\s*\n|\n(?=[*#:|!<])/).map(p => p.trim())
+  return paragraphs.find(p => p && !/^([*#:|!=<]|\{\{)/.test(p)) || ''
+}
+
+/**
+ * 「生成」章节的正文，整理成压缩规则能吃的纯文本。
+ * 列表条目与表格先在 wikitext 上丢掉：渲染成 HTML 再删会留下一堆空段落；
+ * {{sfrac}} 也要先展开，渲染出来的上下标去掉标签后会粘成「35264」。
+ * 中文本地化页面没有该章节时返回空串，调用方会改用原版页面的英文正文。
+ */
+function generationText(zhText, enText) {
+  const body = (zhText && sectionBody(zhText, SECTION_NAMES.generation[0]))
+    || (enText && sectionBody(enText, SECTION_NAMES.generation[1]))
+  if (!body) return ''
+  const trimmed = dropListItems(stripTables(stripStandaloneTemplates(body)))
+  return htmlToText(stripCitations(expandFractions(trimmed)), { keepParagraphs: true })
 }
 
 function boldName(text) {
@@ -627,13 +525,9 @@ function boldName(text) {
   return m ? m[1].trim() : ''
 }
 
-function trimSummary(text, max = 160) {
-  const clean = text.replace(/\s+/g, ' ').replace(/\[\d+\]/g, '').trim()
-  if (clean.length <= max) return clean
-  const cut = clean.slice(0, max)
-  const end = Math.max(cut.lastIndexOf('。'), cut.lastIndexOf('；'))
-  return end > max / 2 ? cut.slice(0, end + 1) : `${cut}…`
-}
+// 简介与「生成」的整理规则、手写译文见 scripts/item-summary.js 与 scripts/item-generation.js
+const { condenseSummary, DESCRIPTION_ZH } = require('./item-summary')
+const { condenseGeneration, GENERATION_ZH } = require('./item-generation')
 
 // ── 翻译 ────────────────────────────────────────────────────────────────────
 const untranslated = new Map()
@@ -721,11 +615,9 @@ async function main() {
   const rendered = await renderSnippets(boxes.map(s => s.box))
   boxes.forEach((stub, i) => { stub.info = parseInfoboxHtml(rendered[i]) })
 
-  // 宝石的贴图文件需另外查询地址
-  const gemStubs = stubs.filter(s => s.gem)
-  const gemUrls = await fetchImageUrls(gemStubs.map(s => s.gem.tileFile).filter(Boolean))
-  for (const stub of gemStubs) {
-    stub.info = { glyph: stub.gem.glyph, colorClass: stub.gem.color, tileUrl: gemUrls.get(stub.gem.tileFile) || '', rows: stub.gem.rows }
+  // 宝石页是一条表格，行的字段在 parseGemTable 中已整理好
+  for (const stub of stubs.filter(s => s.gem)) {
+    stub.info = { glyph: stub.gem.glyph, colorClass: stub.gem.color, rows: stub.gem.rows }
   }
 
   // 同一页面同一信息框的条目合并（如 sake 与 booze）
@@ -756,23 +648,39 @@ async function main() {
     const zh = texts.get(`${record.stubs[0].page}/zh-CN`)
     if (zh && pageUsers.get(record.stubs[0].page) === 1) zhTexts.set(record, zh)
   }
-  const summaries = await renderSnippets(Array.from(zhTexts.values()).map(leadParagraph))
-  const summaryOf = new Map(Array.from(zhTexts.keys()).map((r, i) => [r, trimSummary(htmlToText(summaries[i]))]))
+  // 简介取自 wiki 的「描述」章节（中文本地化页面），没有该章节的物品不显示简介
+  const pending = []
+  for (const [record, zh] of zhTexts) {
+    const paragraph = firstParagraph(sectionBody(zh, '描述'))
+    if (paragraph) pending.push([record, stripCitations(paragraph)])
+  }
+  const renderedSummaries = await renderSnippets(pending.map(([, paragraph]) => paragraph))
+  const rawSummaryOf = new Map()
+  pending.forEach(([record], i) => {
+    const text = htmlToText(renderedSummaries[i]).replace(/\s+/g, ' ').replace(/\[\d+\]/g, '').trim()
+    if (text) rawSummaryOf.set(record, text)
+  })
+
+  // 「生成」取自 wiki 的「生成」章节，中文本地化页面没有该章节时退回原版页面的英文正文。
+  // 共用一个页面的多个物品（宝石等）拿不到自己的正文，与简介一样跳过。
+  // 这里与 scripts/fetch-generation.js 走同一条流水线（先转纯文本再渲染一次再转纯文本），
+  // 好让单独补「生成」时写出的 items.json 与整份重新生成的结果逐字一致。
+  const generationPending = []
+  for (const record of records) {
+    const page = record.stubs[0].page
+    if (pageUsers.get(page) !== 1) continue
+    const text = generationText(zhTexts.get(record), texts.get(page))
+    if (text) generationPending.push([record, text])
+  }
+  const renderedGenerations = await renderSnippets(generationPending.map(([, text]) => text))
+  const generationOf = new Map()
+  generationPending.forEach(([record], i) => {
+    const text = htmlToText(renderedGenerations[i], { keepParagraphs: true })
+    if (text) generationOf.set(record, text)
+  })
 
   console.log('读取 tileset 物品顺序…')
-  const objectTiles = parseObjectTiles(await (await request(OBJECTS_TXT)).text())
-
-  // 贴图
-  console.log('下载 wiki 贴图…')
-  const tileData = new Map()
-  for (const url of new Set(records.map(r => r.stubs[0].info.tileUrl).filter(Boolean))) {
-    try {
-      tileData.set(url, Buffer.from(await (await request(url)).arrayBuffer()).toString('base64'))
-      await sleep(100)
-    } catch (e) {
-      console.warn(`贴图下载失败: ${url} ${e.message}`)
-    }
-  }
+  const objectTiles = parseObjectTiles(await fetchObjectsTxt())
 
   // 物品名映射，用于翻译"基础物品""对应道具"等值
   const nameMap = new Map()
@@ -846,7 +754,16 @@ async function main() {
     }
 
     const tileIndex = findTileIndex(objectTiles, stub, record.stubs.flatMap(s => s.entry.en))
-    const tile = tileData.get(info.tileUrl)
+    // 手写译文直接用；wiki 正文里的句子要先去重（复述信息框数值的部分卡片上已经有了）
+    const curated = DESCRIPTION_ZH[stub.full.toLowerCase()]
+    const fromWiki = rawSummaryOf.get(record)
+    const summary = curated
+      || (fromWiki ? condenseSummary(fromWiki, { zhName, name: stub.full, stats, lists }) : '')
+    // 「生成」同理：先看手写译文，再拿 wiki 正文按优先级压缩成一段
+    const curatedGeneration = GENERATION_ZH[stub.full.toLowerCase()]
+    const generationWiki = generationOf.get(record)
+    const generation = curatedGeneration
+      || (generationWiki ? condenseGeneration(generationWiki, { zhName, aliases: Array.from(aliases) }) : '')
     return {
       name: stub.full,
       zhName,
@@ -856,11 +773,11 @@ async function main() {
       glyph: info.glyph || '?',
       color: stub.gem ? info.colorClass : nethackColor(info.colorClass),
       ...(tileIndex !== undefined ? { tileIndex } : {}),
-      ...(tile ? { wikiTile: tile } : {}),
       page: stub.page,
       stats,
       lists,
-      ...(summaryOf.get(record) ? { summary: summaryOf.get(record) } : {}),
+      ...(summary ? { summary } : {}),
+      ...(generation ? { generation } : {}),
     }
   })
 
@@ -872,7 +789,6 @@ async function main() {
     const baseItem = base && (byEnglish.get(base.toLowerCase()) || byEnglish.get(base.toLowerCase().replace(/^pair of /, '')))
     if (!baseItem) continue
     if (item.tileIndex === undefined && baseItem.tileIndex !== undefined) item.tileIndex = baseItem.tileIndex
-    if (!item.wikiTile && baseItem.wikiTile) item.wikiTile = baseItem.wikiTile
   }
 
   // 未鉴定外观，用于回答"XX 是什么"
@@ -903,8 +819,13 @@ async function main() {
     appearances,
   }, null, 1))
 
-  console.log(`已写入 ${outPath}：${items.length} 个物品，${appearances.length} 个外观`)
+  console.log(`已写入 ${outPath}：${items.length} 个物品，${appearances.length} 个外观，${items.filter(i => i.summary).length} 条简介，${items.filter(i => i.generation).length} 条生成`)
   if (missing.length > 0) console.log(`未找到信息框：${missing.join('、')}`)
+  const usedOverrides = new Set(items.map(i => i.name.toLowerCase()))
+  const unused = Object.keys(DESCRIPTION_ZH).filter(key => !usedOverrides.has(key))
+  if (unused.length > 0) console.log(`简介译文未匹配到物品（请检查键名）：${unused.join('、')}`)
+  const unusedGeneration = Object.keys(GENERATION_ZH).filter(key => !usedOverrides.has(key))
+  if (unusedGeneration.length > 0) console.log(`生成译文未匹配到物品（请检查键名）：${unusedGeneration.join('、')}`)
   if (untranslated.size > 0) {
     console.log('未翻译的内容：')
     for (const [text, count] of untranslated) console.log(`  ${text}${count > 1 ? ` ×${count}` : ''}`)

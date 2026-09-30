@@ -12,6 +12,7 @@ export interface ItemCardData {
   stats: Array<{ label: string; value: string; note?: string }>
   lists: Array<{ label: string; values: string[] }>
   summary?: string
+  generation?: string   // wiki「生成」章节的简明介绍：这东西上哪弄
   tileImages?: Buffer[]  // 32×32 贴图（每个 tileset 一张）
 }
 
@@ -215,6 +216,7 @@ export function buildItemCardHtml(data: ItemCardData, fontsDir: string): string 
     renderStatGrid(stats),
     details.length > 0 ? panel('详情', details.join('')) : '',
     data.summary ? panel('简介', `<p class="summary">${esc(data.summary)}</p>`) : '',
+    data.generation ? panel('生成', `<p class="summary">${esc(data.generation)}</p>`) : '',
   ].filter(Boolean).join('')
 
   return `<!doctype html>

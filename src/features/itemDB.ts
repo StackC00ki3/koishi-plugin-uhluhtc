@@ -19,6 +19,7 @@ interface ItemRecord {
   stats: Array<{ label: string; value: string; note?: string }>
   lists: Array<{ label: string; values: string[] }>
   summary?: string       // wiki「描述」章节的简明介绍
+  generation?: string    // wiki「生成」章节的简明介绍
 }
 
 /** 未鉴定时的外观 */
@@ -160,6 +161,7 @@ export class ItemDB {
       stats: item.stats,
       lists: item.lists,
       summary: item.summary,
+      generation: item.generation,
       tileImages,
     }
   }
@@ -178,5 +180,6 @@ function formatItemText(item: ItemRecord): string {
   for (const s of item.stats) lines.push(`${s.label}: ${s.value}${s.note ? `（${s.note}）` : ''}`)
   for (const l of item.lists) lines.push(`${l.label}: ${l.values.join(' / ')}`)
   if (item.summary) lines.push(item.summary)
+  if (item.generation) lines.push(`生成: ${item.generation}`)
   return lines.join('\n')
 }
