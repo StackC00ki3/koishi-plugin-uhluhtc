@@ -3,7 +3,7 @@ import * as path from 'path'
 import { Logger } from 'koishi'
 import { Tiles } from './tiles'
 import { CardRenderer } from './cardRenderer'
-import { buildItemCardHtml, ItemCardData, ITEM_CATEGORY_LABELS } from './itemCard'
+import { buildItemCardHtml, BucEffects, ItemCardData, ITEM_CATEGORY_LABELS } from './itemCard'
 
 /** scripts/fetch-item-data.js 生成的物品数据 */
 interface ItemRecord {
@@ -20,6 +20,7 @@ interface ItemRecord {
   lists: Array<{ label: string; values: string[] }>
   summary?: string       // wiki「描述」章节的简明介绍
   generation?: string    // wiki「生成」章节的简明介绍
+  buc?: BucEffects       // 药水的 BUC 效果（scripts/item-buc.js 手工整理）
 }
 
 /** 未鉴定时的外观 */
@@ -162,6 +163,7 @@ export class ItemDB {
       lists: item.lists,
       summary: item.summary,
       generation: item.generation,
+      buc: item.buc,
       tileImages,
     }
   }
@@ -180,6 +182,10 @@ function formatItemText(item: ItemRecord): string {
   for (const s of item.stats) lines.push(`${s.label}: ${s.value}${s.note ? `（${s.note}）` : ''}`)
   for (const l of item.lists) lines.push(`${l.label}: ${l.values.join(' / ')}`)
   if (item.summary) lines.push(item.summary)
+  if (item.buc) {
+    lines.push(`祝福: ${item.buc.blessed}`, `未诅咒: ${item.buc.uncursed}`, `诅咒: ${item.buc.cursed}`)
+    if (item.buc.note) lines.push(item.buc.note)
+  }
   if (item.generation) lines.push(`生成: ${item.generation}`)
   return lines.join('\n')
 }

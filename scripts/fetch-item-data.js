@@ -525,9 +525,11 @@ function boldName(text) {
   return m ? m[1].trim() : ''
 }
 
-// 简介与「生成」的整理规则、手写译文见 scripts/item-summary.js 与 scripts/item-generation.js
+// 简介与「生成」的整理规则、手写译文见 scripts/item-summary.js 与 scripts/item-generation.js，
+// 药水的「BUC 效果」见 scripts/item-buc.js
 const { condenseSummary, DESCRIPTION_ZH } = require('./item-summary')
 const { condenseGeneration, GENERATION_ZH } = require('./item-generation')
+const { BUC_ZH } = require('./item-buc')
 
 // ── 翻译 ────────────────────────────────────────────────────────────────────
 const untranslated = new Map()
@@ -754,11 +756,12 @@ async function main() {
     }
 
     const tileIndex = findTileIndex(objectTiles, stub, record.stubs.flatMap(s => s.entry.en))
-    // 手写译文直接用；wiki 正文里的句子要先去重（复述信息框数值的部分卡片上已经有了）
+    const buc = BUC_ZH[stub.full.toLowerCase()]
+    // 手写译文直接用；wiki 正文里的句子要先去重（复述信息框数值、BUC 效果的部分卡片上已经有了）
     const curated = DESCRIPTION_ZH[stub.full.toLowerCase()]
     const fromWiki = rawSummaryOf.get(record)
     const summary = curated
-      || (fromWiki ? condenseSummary(fromWiki, { zhName, name: stub.full, stats, lists }) : '')
+      || (fromWiki ? condenseSummary(fromWiki, { zhName, name: stub.full, stats, lists, buc }) : '')
     // 「生成」同理：先看手写译文，再拿 wiki 正文按优先级压缩成一段
     const curatedGeneration = GENERATION_ZH[stub.full.toLowerCase()]
     const generationWiki = generationOf.get(record)
@@ -778,6 +781,7 @@ async function main() {
       lists,
       ...(summary ? { summary } : {}),
       ...(generation ? { generation } : {}),
+      ...(buc ? { buc } : {}),
     }
   })
 
@@ -826,6 +830,8 @@ async function main() {
   if (unused.length > 0) console.log(`简介译文未匹配到物品（请检查键名）：${unused.join('、')}`)
   const unusedGeneration = Object.keys(GENERATION_ZH).filter(key => !usedOverrides.has(key))
   if (unusedGeneration.length > 0) console.log(`生成译文未匹配到物品（请检查键名）：${unusedGeneration.join('、')}`)
+  const unusedBuc = Object.keys(BUC_ZH).filter(key => !usedOverrides.has(key))
+  if (unusedBuc.length > 0) console.log(`BUC 效果未匹配到物品（请检查键名）：${unusedBuc.join('、')}`)
   if (untranslated.size > 0) {
     console.log('未翻译的内容：')
     for (const [text, count] of untranslated) console.log(`  ${text}${count > 1 ? ` ×${count}` : ''}`)

@@ -13,7 +13,16 @@ export interface ItemCardData {
   lists: Array<{ label: string; values: string[] }>
   summary?: string
   generation?: string   // wiki「生成」章节的简明介绍：这东西上哪弄
+  buc?: BucEffects       // 药水的 BUC 效果
   tileImages?: Buffer[]  // 32×32 贴图（每个 tileset 一张）
+}
+
+/** 祝福 / 未诅咒 / 诅咒三种状态各自的效果，note 是三者共有的补充说明（见 scripts/item-buc.js） */
+export interface BucEffects {
+  blessed: string
+  uncursed: string
+  cursed: string
+  note?: string
 }
 
 export const ITEM_CATEGORY_LABELS: Record<string, string> = {
@@ -216,6 +225,7 @@ export function buildItemCardHtml(data: ItemCardData, fontsDir: string): string 
     renderStatGrid(stats),
     details.length > 0 ? panel('详情', details.join('')) : '',
     data.summary ? panel('简介', `<p class="summary">${esc(data.summary)}</p>`) : '',
+    data.buc ? renderBuc(data.buc) : '',
     data.generation ? panel('生成', `<p class="summary">${esc(data.generation)}</p>`) : '',
   ].filter(Boolean).join('')
 
@@ -247,6 +257,20 @@ ${ITEM_STYLE}
 </div>
 </body>
 </html>`
+}
+
+const BUC_ROWS: Array<['blessed' | 'uncursed' | 'cursed', string]> = [
+  ['blessed', '祝福'],
+  ['uncursed', '未诅咒'],
+  ['cursed', '诅咒'],
+]
+
+/** 三种状态各占一行，标签按物品栏的习惯配色：祝福偏青、诅咒偏红 */
+function renderBuc(buc: BucEffects): string {
+  const rows = BUC_ROWS.map(([key, label]) =>
+    `<div class="buc-row"><span class="buc-k buc-${key}">${label}</span><p class="buc-v">${esc(buc[key])}</p></div>`).join('')
+  const note = buc.note ? `<p class="buc-note">${esc(buc.note)}</p>` : ''
+  return panel('BUC 效果', rows + note)
 }
 
 /**
@@ -296,4 +320,19 @@ const ITEM_STYLE = `
 .stat-parts div { flex-direction: column; align-items: flex-start; }
 .stat-parts div + div b { color: var(--accent); }
 .stat-v.long { word-break: normal; }
+.buc-row { display: flex; align-items: flex-start; gap: 10px; }
+.buc-row + .buc-row { margin-top: 8px; }
+.buc-k {
+  flex: none; width: 48px;
+  border-radius: 6px;
+  text-align: center;
+  font-size: 12px; font-weight: 600; line-height: 22px;
+  color: var(--text-2);
+  background: rgb(255 255 255 / 5%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 8%);
+}
+.buc-blessed { color: #7fd4ff; background: rgb(127 212 255 / 10%); box-shadow: inset 0 0 0 1px rgb(127 212 255 / 28%); }
+.buc-cursed { color: var(--chaotic); background: rgb(255 123 123 / 10%); box-shadow: inset 0 0 0 1px rgb(255 123 123 / 28%); }
+.buc-v { flex: 1; min-width: 0; font-size: 13px; line-height: 22px; color: var(--text); text-align: justify; }
+.buc-note { margin-top: 10px; font-size: 12px; line-height: 1.6; color: var(--text-3); text-align: justify; }
 `

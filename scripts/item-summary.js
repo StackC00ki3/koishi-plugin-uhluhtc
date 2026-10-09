@@ -120,10 +120,32 @@ function cleanSummary(text) {
   return trimSummary(clean)
 }
 
-/** 生成图鉴简介：先删掉复述信息框的句子，再按长度精简 */
+// ── BUC 效果 ────────────────────────────────────────────────────────────────
+// 药水卡片有单独的「BUC 效果」一栏（scripts/item-buc.js），简介里按 BUC 分列的数值再出现一遍就重复了：
+//   「……，持续回合数根据药水的BUC而定：祝福为……」 从提到 BUC 的分句起到句末都去掉
+//   「祝福的药水回复8d8 HP，……」「若药水非诅咒，则……」 以某个 BUC 状态开头的整句去掉
+//   「会根据药水的BUC来治疗……」 只删状语，句子其余部分留着
+const BUC_ADVERBIAL = /根据(药水的|其)?BUC来/g
+const BUC_SENTENCE = /^(此外|另外|同时)?[，,]?(若|如果)?(药水)?(是|为)?(受|被|非|未)?(祝福|诅咒)/
+const SENTENCE = /[^。！？]+[。！？]?/g
+
+function dropBucDetails(text) {
+  const sentences = text.replace(BUC_ADVERBIAL, '').match(SENTENCE) || []
+  return sentences.map(sentence => {
+    if (BUC_SENTENCE.test(sentence.trim())) return ''
+    const clauses = sentence.match(CLAUSE) || [sentence]
+    const at = clauses.findIndex(c => c.includes('BUC'))
+    if (at === -1) return sentence
+    const kept = clauses.slice(0, at).join('').replace(/[，、；：:]+$/, '')
+    return kept ? `${kept}。` : ''
+  }).join('').trim()
+}
+
+/** 生成图鉴简介：先删掉复述信息框（以及 BUC 效果一栏）的句子，再按长度精简 */
 function condenseSummary(text, item) {
-  if (!text) return ''
-  return cleanSummary(dropRestatements(text, item))
+  const body = text && item.buc ? dropBucDetails(text) : text
+  if (!body) return ''
+  return cleanSummary(dropRestatements(body, item))
 }
 
 // 手工撰写的简介，直接使用，不参与上面的去重规则。两种情况：
@@ -179,4 +201,4 @@ const DESCRIPTION_ZH = {
   'worthless piece of glass': '各类玻璃都属于软宝石，没有基础价格，但商店在鉴定之前仍会按真宝石的价格标价。与多数玻璃制品不同，它不会在正常情况下摔碎。',
 }
 
-module.exports = { DESCRIPTION_ZH, condenseSummary, cleanSummary, dropRestatements, isStatClause, trimSummary, SUMMARY_MAX }
+module.exports = { DESCRIPTION_ZH, condenseSummary, cleanSummary, dropRestatements, dropBucDetails, isStatClause, trimSummary, SUMMARY_MAX }
