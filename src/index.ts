@@ -26,6 +26,12 @@ export interface Config {
   lejiuAdminUserId?: string
   lejiuCancelUserId?: string
   lejiuReplyDelay?: number
+  lejiuDriftBottleEnabled?: boolean
+  lejiuDriftBottleGroupIds?: string[]
+  lejiuTarotEnabled?: boolean
+  lejiuTarotGroupIds?: string[]
+  lejiuFixedReplyEnabled?: boolean
+  lejiuFixedReplyGroupIds?: string[]
 }
 
 export const Config: Schema<Config> = Schema.object({
@@ -38,6 +44,12 @@ export const Config: Schema<Config> = Schema.object({
   lejiuAdminUserId: Schema.string().description('乐九管理员 QQ；该用户可通过 @乐九 开机 / @乐九 关机 修改乐九模块开关。').default('2903144214'),
   lejiuCancelUserId: Schema.string().description('乐九回复取消用户 QQ；该用户在等待期间发言会取消待发送回复。').default('2903144214'),
   lejiuReplyDelay: Schema.number().role('time').description('乐九功能回复前等待时间。').default(3 * 1000),
+  lejiuDriftBottleEnabled: Schema.boolean().description('是否启用乐九漂流瓶功能（受乐九总开关约束）。').default(true),
+  lejiuDriftBottleGroupIds: Schema.array(String).role('table').description('漂流瓶仅在这些群号或私聊QQ号生效（留空则跟随乐九全部会话）').default([]),
+  lejiuTarotEnabled: Schema.boolean().description('是否启用乐九塔罗牌功能（受乐九总开关约束）。').default(true),
+  lejiuTarotGroupIds: Schema.array(String).role('table').description('塔罗牌仅在这些群号或私聊QQ号生效（留空则跟随乐九全部会话）').default([]),
+  lejiuFixedReplyEnabled: Schema.boolean().description('是否启用乐九自定义回复功能（含固定回复，受乐九总开关约束）。').default(true),
+  lejiuFixedReplyGroupIds: Schema.array(String).role('table').description('自定义回复仅在这些群号或私聊QQ号生效（留空则跟随乐九全部会话）').default([]),
 })
 
 export async function apply(ctx: Context, config: Config) {
@@ -107,6 +119,18 @@ export async function apply(ctx: Context, config: Config) {
     adminUserId: lejiuAdminUserId,
     cancelUserId: lejiuCancelUserId,
     replyDelay: lejiuReplyDelay,
+    driftBottle: {
+      enabled: config.lejiuDriftBottleEnabled !== false,
+      groupIds: config.lejiuDriftBottleGroupIds || [],
+    },
+    tarot: {
+      enabled: config.lejiuTarotEnabled !== false,
+      groupIds: config.lejiuTarotGroupIds || [],
+    },
+    fixedReplies: {
+      enabled: config.lejiuFixedReplyEnabled !== false,
+      groupIds: config.lejiuFixedReplyGroupIds || [],
+    },
     isSessionEnabled,
   })
 

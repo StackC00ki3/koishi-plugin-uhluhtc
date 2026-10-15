@@ -15,17 +15,48 @@ interface SessionLike {
 
 type LejiuAction = () => Promise<string | undefined> | string | undefined
 
+export interface LejiuFeatureToggle {
+  enabled: boolean
+  groupIds: string[]
+}
+
 export interface LejiuFeatureOptions {
   enabled: boolean
   dataDir: string
   adminUserId: string
   cancelUserId: string
   replyDelay: number
+  driftBottle: LejiuFeatureToggle
+  tarot: LejiuFeatureToggle
+  fixedReplies: LejiuFeatureToggle
   isSessionEnabled(session: SessionLike): boolean
 }
 
 const resolveChannelId = (session: SessionLike): string => {
   return session.cid || session.channelId || session.guildId || session.userId || `private:${session.platform}`
+}
+
+interface LejiuFeatureScope {
+  enabled: boolean
+  groupIds: Set<string>
+}
+
+const resolveFeatureScope = (toggle: LejiuFeatureToggle): LejiuFeatureScope => ({
+  enabled: toggle.enabled,
+  groupIds: new Set((toggle.groupIds || []).map(id => String(id).trim()).filter(Boolean)),
+})
+
+const isFeatureEnabled = (scope: LejiuFeatureScope, session: SessionLike): boolean => {
+  if (!scope.enabled) return false
+  if (session.platform?.includes('sandbox')) return true
+  if (scope.groupIds.size === 0) return true
+  const guildId = session.guildId?.trim()
+  if (guildId) return scope.groupIds.has(guildId)
+
+  // 私聊场景无 guildId，兼容使用 QQ 号（userId）白名单
+  const userId = session.userId?.trim()
+  if (!userId) return false
+  return scope.groupIds.has(userId)
 }
 
 export const setupLejiuFeatures = (ctx: Context, options: LejiuFeatureOptions) => {
@@ -35,6 +66,9 @@ export const setupLejiuFeatures = (ctx: Context, options: LejiuFeatureOptions) =
   const tarot = new LejiuTarot(options.dataDir)
   const pendingByChannel = new Map<string, NodeJS.Timeout>()
   let enabled = options.enabled
+  const driftBottleScope = resolveFeatureScope(options.driftBottle)
+  const tarotScope = resolveFeatureScope(options.tarot)
+  const fixedRepliesScope = resolveFeatureScope(options.fixedReplies)
 
   const resolvePowerCommand = (content: string): 'on' | 'off' | undefined => {
     const normalized = content
@@ -120,12 +154,16 @@ export const setupLejiuFeatures = (ctx: Context, options: LejiuFeatureOptions) =
 
     if (!enabled) return
 
-    const action = driftBottle.resolve(session, content)
-      || tarot.resolve(content)
-      || fixedReplies.resolve(session, content)
+    const action = (isFeatureEnabled(driftBottleScope, session) ? driftBottle.resolve(session, content) : undefined)
+      || (isFeatureEnabled(tarotScope, session) ? tarot.resolve(content) : undefined)
+      || (isFeatureEnabled(fixedRepliesScope, session) ? fixedReplies.resolve(session, content) : undefined)
 
     if (action) schedule(session, action)
   })
 
-  logger.info(`乐九模块已注册，初始状态=${enabled ? '开启' : '关闭'}，数据目录=${options.dataDir}，管理员=${options.adminUserId}，取消用户=${options.cancelUserId}，延迟=${options.replyDelay}ms`)
+  const describeScope = (scope: LejiuFeatureScope): string => {
+    if (!scope.enabled) return '关闭'
+    return scope.groupIds.size > 0 ? `开启（白名单 ${scope.groupIds.size} 条）` : '开启（全部会话）'
+  }
+  logger.info(`乐九模块已注册，初始状态=${enabled ? '开启' : '关闭'}，数据目录=${options.dataDir}，管理员=${options.adminUserId}，取消用户=${options.cancelUserId}，延迟=${options.replyDelay}ms，漂流瓶=${describeScope(driftBottleScope)}，塔罗牌=${describeScope(tarotScope)}，自定义回复=${describeScope(fixedRepliesScope)}`)
 }
