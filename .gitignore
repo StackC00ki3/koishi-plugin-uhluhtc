@@ -3,7 +3,9 @@ node_modules/
 package-lock.json
 yarn.lock
 pnpm-lock.yaml
-data/
+
+# --- 运行数据：纳入版本管理，仅排除字体 ---
+data/uhluhtc/fonts/
 
 # --- 编译产物 (TypeScript/Build) ---
 lib/

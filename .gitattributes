@@ -1,7 +1,13 @@
-* text eol=lf
+# 图片/字体/图块集等二进制资源禁止行尾转换，防止 autocrlf 破坏文件
+*.jpg  binary
+*.jpeg binary
+*.png  binary
+*.bmp  binary
+*.gif  binary
+*.ttf  binary
+*.ttc  binary
+*.otf  binary
+*.7z   binary
 
-*.png -text
-*.jpg -text
-*.ico -text
-*.gif -text
-*.webp -text
+# 无扩展名的图块集数据文件
+data/uhluhtc/tilesets/* binary
